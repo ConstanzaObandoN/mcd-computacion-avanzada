@@ -1,16 +1,18 @@
-# Nombre Apellido
+# Constanza Obando
 
 ## Perfil
 
-**Disciplina / formación:**  
-**Qué hago hoy:**  
+**Formación:** Ingeniera en Diseño de Productos  
+
+**Qué hago hoy:** Coordinadora de laboratorio de prototipado y Docente de la Universidad de Los Lagos 
+
 **Qué me gustaría aprender en este curso:**  
 
 ## Intereses
 
-- Tema o disciplina 1
-- Tema o disciplina 2
-- Tema o disciplina 3
+- Fabricación digital
+- Robótica
+- Tecnologías Asistivas
 
 ## Una pregunta que me interesa explorar
 
@@ -18,11 +20,7 @@ Escribe una pregunta pequeña que pueda transformarse en reglas, datos, geometr�
 
 ## Algo que me inspira
 
-Agrega una imagen local en `assets/images/` y cítala con Markdown, o agrega un link a un proyecto/referencia.
-
-```md
-![Descripción de la imagen](../assets/images/mi-imagen.jpg)
-```
+![personaciega](/assets/images/personaciega.png)
 
 ## Links
 
