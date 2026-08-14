@@ -2,12 +2,11 @@
 
 ## Perfil
 
-**Formación:** Ingeniera en Diseño de Productos  
+**Formación:** Ingeniera en Diseño de Productos, UTFSM
 
 **Qué hago hoy:** Coordinadora de laboratorio de prototipado y Docente de la Universidad de Los Lagos 
 
-**Qué me gustaría aprender en este curso:**  
-
+**Qué me gustaría aprender en este curso:**  Todo lo que se pueda
 ## Intereses
 
 - Fabricación digital
@@ -16,7 +15,7 @@
 
 ## Una pregunta que me interesa explorar
 
-Escribe una pregunta pequeña que pueda transformarse en reglas, datos, geometría, imágenes o interacción.
+¿Se puede recuperar la autonomía tras la pérdida de una extremidad superior?
 
 ## Algo que me inspira
 
@@ -24,7 +23,7 @@ Escribe una pregunta pequeña que pueda transformarse en reglas, datos, geometr�
 
 ## Links
 
-- [Referencia 1](https://example.com)
-- [Referencia 2](https://example.com)
+- [Referencia 1](https://dawn2021.orylab.com/en/)
+- [Referencia 2]([https://example.com](https://www.teleton.cl/tecnologia/rodin-tecnologia-teleton-ortesis/))
 
-> No es necesario publicar información personal que no quieras compartir. Este README será parte de un repositorio público durante el laboratorio.
+//> No es necesario publicar información personal que no quieras compartir. Este README será parte de un repositorio público durante el laboratorio.
