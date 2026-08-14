@@ -24,6 +24,6 @@
 ## Links
 
 - [Referencia 1](https://dawn2021.orylab.com/en/)
-- [Referencia 2]([https://example.com](https://www.teleton.cl/tecnologia/rodin-tecnologia-teleton-ortesis/))
+- [Referencia 2](https://example.com](https://www.teleton.cl/tecnologia/rodin-tecnologia-teleton-ortesis/))
 
-//> No es necesario publicar información personal que no quieras compartir. Este README será parte de un repositorio público durante el laboratorio.
+ 
