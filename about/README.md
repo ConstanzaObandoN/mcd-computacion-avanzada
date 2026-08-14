@@ -23,7 +23,7 @@
 
 ## Links
 
-- [Referencia 1](https://dawn2021.orylab.com/en/)
-- [Referencia 2](https://example.com](https://www.teleton.cl/tecnologia/rodin-tecnologia-teleton-ortesis/))
+- [Dawn coffee: Cafeteria atendida por robots manipulados por personas en situación de discapacidad ](https://dawn2021.orylab.com/en/)
+- [Rodin Teletón: Tecnología ágil para la fabricación de prótesis ](https://example.com](https://www.teleton.cl/tecnologia/rodin-tecnologia-teleton-ortesis/))
 
  
