@@ -1,0 +1,66 @@
+<!doctype html>
+<html lang="es">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta name="description" content="Perfil y exploraciones de Constanza Obando para Computación Avanzada." />
+    <title>Constanza Obando · Computación Avanzada</title>
+    <link rel="stylesheet" href="styles.css" />
+    <script type="module" src="https://unpkg.com/@google/model-viewer@3.5.0/dist/model-viewer.min.js"></script>
+  </head>
+  <body>
+    <main class="site-shell">
+      <header class="hero">
+        <p class="eyebrow">COMPUTACIÓN AVANZADA · MCD UAI</p>
+        <h1>Constanza Obando</h1>
+        <p class="intro">Ingeniera en Diseño de Productos, coordinadora de laboratorio de prototipado y docente de la Universidad de Los Lagos.</p>
+      </header>
+
+      <section class="profile-grid" aria-label="Perfil">
+        <div>
+          <h2>Perfil</h2>
+          <dl>
+            <div><dt>Formación</dt><dd>Ingeniera en Diseño de Productos, UTFSM</dd></div>
+            <div><dt>Qué hago hoy</dt><dd>Coordinadora de laboratorio de prototipado y docente de la Universidad de Los Lagos</dd></div>
+            <div><dt>Qué me gustaría aprender en este curso</dt><dd>Todo lo que se pueda</dd></div>
+          </dl>
+
+          <h2>Intereses</h2>
+          <ul class="tags"><li>Fabricación digital</li><li>Robótica</li><li>Tecnologías asistivas</li></ul>
+
+          <h2>Una pregunta que me interesa explorar</h2>
+          <p class="question">¿Se puede recuperar la autonomía tras la pérdida de una extremidad superior?</p>
+        </div>
+        <figure>
+          <img src="assets/images/personaciega.png" alt="Imagen de inspiración" />
+          <figcaption>Algo que me inspira</figcaption>
+        </figure>
+      </section>
+
+      <section class="model-section" aria-labelledby="modelo-3d">
+        <p class="eyebrow">LAB01 · ARTEFACTO DIGITAL</p>
+        <h2 id="modelo-3d">Modelo 3D</h2>
+        <p class="model-help">Arrastra para orbitar y usa la rueda, o pellizca, para acercar.</p>
+        <model-viewer
+          src="assets/models/advanced_prosthetic_leg_design.glb"
+          alt="Modelo tridimensional de una prótesis de pierna avanzada"
+          camera-controls
+          touch-action="pan-y"
+          environment-image="neutral"
+          shadow-intensity="1"
+          camera-orbit="45deg 70deg 105%"
+        >
+          <p>Tu navegador no puede mostrar el visor. <a href="assets/models/advanced_prosthetic_leg_design.glb">Descargar el archivo GLB</a>.</p>
+        </model-viewer>
+      </section>
+
+      <section class="links-section" aria-labelledby="links">
+        <h2 id="links">Links</h2>
+        <ul>
+          <li><a href="https://dawn2021.orylab.com/en/">Dawn coffee: cafetería atendida por robots manipulados por personas en situación de discapacidad</a></li>
+          <li><a href="https://www.teleton.cl/tecnologia/rodin-tecnologia-teleton-ortesis/">Rodin Teletón: tecnología ágil para la fabricación de prótesis</a></li>
+        </ul>
+      </section>
+    </main>
+  </body>
+</html>

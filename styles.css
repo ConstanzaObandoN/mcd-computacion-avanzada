@@ -1,0 +1,28 @@
+:root { --bg: #101010; --surface: #181817; --line: #35352f; --text: #f0eee8; --muted: #b5b1a8; --accent: #d5b17b; }
+* { box-sizing: border-box; }
+html { background: var(--bg); }
+body { margin: 0; background: radial-gradient(circle at 78% 14%, #29251d 0, transparent 30rem), var(--bg); color: var(--text); font-family: Inter, ui-sans-serif, system-ui, sans-serif; line-height: 1.55; }
+a { color: var(--text); text-decoration-color: var(--accent); text-underline-offset: .22em; }
+a:hover { color: var(--accent); }
+.site-shell { width: min(1120px, calc(100% - 3rem)); margin: auto; padding: 6rem 0 4rem; }
+.hero { max-width: 760px; padding-bottom: 4rem; border-bottom: 1px solid var(--line); }
+.eyebrow { margin: 0 0 .75rem; color: var(--accent); font-size: .72rem; font-weight: 700; letter-spacing: .16em; }
+h1, h2 { font-weight: 400; letter-spacing: -.035em; }
+h1 { margin: 0; font-size: clamp(3rem, 8vw, 6.5rem); line-height: .95; }
+h2 { margin: 0 0 1.25rem; font-size: clamp(1.55rem, 3vw, 2.35rem); line-height: 1.05; }
+.intro { max-width: 620px; margin: 1.5rem 0 0; color: var(--muted); font-size: clamp(1.05rem, 2vw, 1.3rem); }
+.profile-grid { display: grid; grid-template-columns: minmax(0, 1.1fr) minmax(260px, .9fr); gap: clamp(2.5rem, 7vw, 7rem); padding: 4rem 0; }
+.profile-grid h2:not(:first-child) { margin-top: 3rem; }
+dl { margin: 0; } dl div { padding: 1rem 0; border-top: 1px solid var(--line); }
+dt { color: var(--accent); font-size: .75rem; font-weight: 700; letter-spacing: .08em; text-transform: uppercase; }
+dd { margin: .28rem 0 0; color: var(--muted); }
+.tags { display: flex; flex-wrap: wrap; gap: .65rem; padding: 0; margin: 0; list-style: none; }
+.tags li { padding: .45rem .75rem; border: 1px solid var(--line); border-radius: 999px; color: var(--muted); }
+.question { max-width: 34rem; margin: 0; font-size: 1.2rem; line-height: 1.42; }
+figure { margin: 0; align-self: start; } figure img { display: block; width: 100%; max-height: 480px; object-fit: cover; filter: saturate(.82); } figcaption { margin-top: .7rem; color: var(--muted); font-size: .85rem; }
+.model-section, .links-section { padding: 4rem 0; border-top: 1px solid var(--line); }
+.model-help { margin: -0.5rem 0 2rem; color: var(--muted); }
+model-viewer { display: block; width: 100%; height: min(66vw, 620px); min-height: 380px; background: #d9d9d5; border: 1px solid var(--line); }
+model-viewer p { padding: 1rem; color: #191919; }
+.links-section ul { padding-left: 1.2rem; } .links-section li + li { margin-top: .8rem; }
+@media (max-width: 700px) { .site-shell { width: min(100% - 2rem, 1120px); padding-top: 3.5rem; } .profile-grid { grid-template-columns: 1fr; } figure { max-width: 430px; } model-viewer { min-height: 320px; } }
