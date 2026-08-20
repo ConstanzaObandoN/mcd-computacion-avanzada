@@ -14,6 +14,7 @@ const valoresIniciales = {
   rotacion: 0.3,
   aleatoriedad: 0.0,
   semilla: 42,
+  lados: 3, //  (3 = triángulo, 4 = cuadrado y asi sucesivamente)
 };
 
 const parametros = { ...valoresIniciales };
@@ -91,9 +92,10 @@ escena.add(grilla);
 const grupoCampo = new THREE.Group();
 escena.add(grupoCampo);
 
-const geometriaModulo = new THREE.OctahedronGeometry(0.76, 1, 0.76);
+// Aqui se cambio la geometria
+let geometriaModulo = new THREE.CylinderGeometry(0.45, 0.45, 1, parametros.lados);
 
-const materialModulo = new THREE.MeshBasicMaterial({
+const materialModulo = new THREE.MeshStandardMaterial({
   color: 0xd7d2c8,
   roughness: 0.58,
   metalness: 0.03,
@@ -135,6 +137,9 @@ function calcularRotacionModulo(x, z) {
 function generarCampo() {
   limpiarCampo();
 
+  if (geometriaModulo) geometriaModulo.dispose();
+  geometriaModulo = new THREE.CylinderGeometry(0.45, 0.45, 1, parametros.lados);
+
   const ancho = (parametros.columnas - 1) * parametros.separacion;
   const profundidad = (parametros.filas - 1) * parametros.separacion;
 
@@ -151,8 +156,7 @@ function generarCampo() {
       // Escalamos solo en Y para modificar la altura.
       modulo.scale.y = altura;
 
-      // BoxGeometry crece hacia arriba y hacia abajo desde su centro.
-      // Por eso elevamos el módulo la mitad de su altura.
+      // Al igual que la caja, el cilindro crece desde el centro:
       modulo.position.set(x, altura / 2, z);
 
       modulo.rotation.y = rotacion;
@@ -202,6 +206,7 @@ const controles = {
   rotacion: document.querySelector("#rotacion"),
   aleatoriedad: document.querySelector("#aleatoriedad"),
   semilla: document.querySelector("#semilla"),
+  lados: document.querySelector("#lados"), 
 };
 
 const valoresVisibles = {
@@ -213,10 +218,11 @@ const valoresVisibles = {
   rotacion: document.querySelector("#rotacion-valor"),
   aleatoriedad: document.querySelector("#aleatoriedad-valor"),
   semilla: document.querySelector("#semilla-valor"),
+  lados: document.querySelector("#lados-valor"), 
 };
 
 function actualizarParametro(nombre, valor) {
-  const parametrosEnteros = ["columnas", "filas", "semilla"];
+  const parametrosEnteros = ["columnas", "filas", "semilla", "lados"];
 
   parametros[nombre] = parametrosEnteros.includes(nombre)
     ? Number.parseInt(valor, 10)
@@ -247,7 +253,8 @@ document.querySelector("#regenerar").addEventListener("click", () => {
 document.querySelector("#restablecer").addEventListener("click", () => {
   Object.assign(parametros, valoresIniciales);
 
-  const parametrosEnteros = ["columnas", "filas", "semilla"];
+
+  const parametrosEnteros = ["columnas", "filas", "semilla", "lados"];
 
   Object.entries(controles).forEach(([nombre, control]) => {
     control.value = parametros[nombre];
@@ -259,6 +266,7 @@ document.querySelector("#restablecer").addEventListener("click", () => {
 
   generarCampo();
 });
+animar();
 
 // ======================================================
 // 08 — BUCLE DE ANIMACIÓN

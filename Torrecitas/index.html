@@ -1,0 +1,62 @@
+<!doctype html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Torrecitas</title>
+  <style>
+    * {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+      user-select: none;
+    }
+    body {
+      background-color: #121316;
+      overflow: hidden;
+      font-family: sans-serif;
+    }
+    #viewport {
+      width: 100vw;
+      height: 100vh;
+      display: block;
+    }
+    #ui {
+      position: absolute;
+      top: 24px;
+      left: 50%;
+      transform: translateX(-50%);
+      color: #f0ede6;
+      text-align: center;
+      pointer-events: none;
+    }
+    #puntos {
+      font-size: 48px;
+      font-weight: 700;
+      letter-spacing: 2px;
+    }
+    #mensaje {
+      font-size: 14px;
+      opacity: 0.7;
+      margin-top: 4px;
+    }
+  </style>
+</head>
+<body>
+  <div id="ui">
+    <div id="puntos">0</div>
+    <div id="mensaje">Haz clic o presiona Espacio para soltar el piso</div>
+  </div>
+
+  <div id="viewport"></div>
+
+  <script type="importmap">
+    {
+      "imports": {
+        "three": "https://cdn.jsdelivr.net/npm/three@0.180.0/build/three.module.js"
+      }
+    }
+  </script>
+  <script type="module" src="./main.js"></script>
+</body>
+</html>
