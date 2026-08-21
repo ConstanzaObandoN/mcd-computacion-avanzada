@@ -91,13 +91,15 @@ baseLampara.castShadow = true;
 escena.add(baseLampara);
 
 // Fuente cálida para leer la estructura como una lámpara.
+// La bombilla queda fijada sobre la base, sin reaccionar al crecimiento de la estructura.
 const luzLampara = new THREE.PointLight(0xffb45f, 28, 18, 2);
-luzLampara.position.set(0, 3.5, 0);
+const POSICION_BOMBILLA = new THREE.Vector3(0, ALTURA_BASE + 0.9, 0);
+luzLampara.position.copy(POSICION_BOMBILLA);
 luzLampara.castShadow = true;
 escena.add(luzLampara);
 
 const bombilla = new THREE.Mesh(
-  new THREE.SphereGeometry(0.48, 24, 16),
+  new THREE.SphereGeometry(0.52, 32, 32),
   new THREE.MeshStandardMaterial({
     color: 0xffd39a,
     emissive: 0xff8a30,
@@ -105,7 +107,8 @@ const bombilla = new THREE.Mesh(
     roughness: 0.45,
   })
 );
-bombilla.position.copy(luzLampara.position);
+bombilla.scale.set(1.18, 1.75, 1.18);
+bombilla.position.copy(POSICION_BOMBILLA);
 escena.add(bombilla);
 
 // ======================================================
@@ -246,9 +249,9 @@ function generarCampo() {
     grupoCampo.add(varilla);
   }
 
-  // La luz acompaña la altura de cada variación generada.
-  luzLampara.position.y = ALTURA_BASE + alturaTotal * 0.52;
-  bombilla.position.copy(luzLampara.position);
+  // La bombilla queda fija sobre la base de la lámpara y no depende de los parámetros.
+  luzLampara.position.copy(POSICION_BOMBILLA);
+  bombilla.position.copy(POSICION_BOMBILLA);
 }
 
 function limpiarCampo() {
