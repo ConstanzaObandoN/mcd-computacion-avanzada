@@ -16,6 +16,18 @@ Documenta de manera breve cuándo y para qué utilizaste asistentes de IA. El ob
 
 **Qué aprendí / qué error apareció:** El visor usa `model-viewer`, sin proceso de compilación.
 
+### 2026-08-20 - exploración generativa LAB02
+
+**Herramienta / agente:** Codex
+
+**Qué pedí:** Completar la exploración generativa del LAB02.
+
+**Qué cambió en el proyecto:** Se sincronizaron los controles con los parámetros de la lámpara generativa y se incorporó una fuente de luz cálida con bombilla visible.
+
+**Qué revisé o corregí manualmente:** Pendiente de probar combinaciones de parámetros en el navegador.
+
+**Qué aprendí / qué error apareció:** La curva paramétrica permite modificar una familia de pantallas sin modelar cada una manualmente.
+
 ### YYYY-MM-DD - tarea
 
 **Herramienta / agente:**  

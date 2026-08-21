@@ -90,6 +90,24 @@ baseLampara.position.y = ALTURA_BASE / 2;
 baseLampara.castShadow = true;
 escena.add(baseLampara);
 
+// Fuente cálida para leer la estructura como una lámpara.
+const luzLampara = new THREE.PointLight(0xffb45f, 28, 18, 2);
+luzLampara.position.set(0, 3.5, 0);
+luzLampara.castShadow = true;
+escena.add(luzLampara);
+
+const bombilla = new THREE.Mesh(
+  new THREE.SphereGeometry(0.48, 24, 16),
+  new THREE.MeshStandardMaterial({
+    color: 0xffd39a,
+    emissive: 0xff8a30,
+    emissiveIntensity: 2.2,
+    roughness: 0.45,
+  })
+);
+bombilla.position.copy(luzLampara.position);
+escena.add(bombilla);
+
 // ======================================================
 // 03 — MATERIALES Y GRUPO
 // ======================================================
@@ -227,6 +245,10 @@ function generarCampo() {
 
     grupoCampo.add(varilla);
   }
+
+  // La luz acompaña la altura de cada variación generada.
+  luzLampara.position.y = ALTURA_BASE + alturaTotal * 0.52;
+  bombilla.position.copy(luzLampara.position);
 }
 
 function limpiarCampo() {

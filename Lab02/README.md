@@ -1,4 +1,4 @@
-# Campo Generativo 01
+# Generador de lámparas
 
 Guía para **Clase 02 — Computación Avanzada**  
 Magíster en Ciencias del Diseño · Universidad Adolfo Ibáñez
@@ -7,19 +7,22 @@ Magíster en Ciencias del Diseño · Universidad Adolfo Ibáñez
 
 > **Diseñar un sistema no significa dibujar una única forma. Significa definir las reglas que producen un espacio de posibilidades.**
 
-Este starter genera un campo tridimensional de módulos mediante reglas simples.
+Esta exploración genera una pantalla de lámpara mediante varillas curvas. Las
+reglas modifican la cantidad de elementos, su apertura, ondulación, torsión y
+variación para producir una familia de objetos tridimensionales.
 
 ## Parámetros
 
 ### Sistema
-- Columnas
-- Filas
-- Separación
+- Lados: definición facetada de cada varilla
+- Columnas: cantidad de varillas en 360°
+- Altura: longitud de la pantalla
+- Separación: apertura de la pantalla
 
 ### Comportamiento
-- Amplitud
-- Frecuencia
-- Rotación
+- Amplitud: intensidad de la ondulación
+- Frecuencia: cantidad de ondas a lo largo de la varilla
+- Rotación: torsión helicoidal
 
 ### Variación
 - Aleatoriedad
@@ -61,54 +64,53 @@ Este proyecto utiliza módulos JavaScript, por lo que debe abrirse mediante un s
 08 — BUCLE DE ANIMACIÓN
 ```
 
-Para LAB02 concéntrate inicialmente en:
+Para LAB02 concéntrate inicialmente en la clase:
 
 ```js
-function calcularAlturaModulo(x, z)
+class CurvaVarilla extends THREE.Curve
 ```
 
-y:
+y dentro de ella:
 
 ```js
-function calcularRotacionModulo(x, z)
+const radio = Math.max(0.3, RADIO_BASE * 0.9 + onda + apertura + ruido);
 ```
 
-Estas dos funciones representan **decisiones de diseño**.
+Estas reglas representan **decisiones de diseño**: cada una modifica la silueta
+de la pantalla sin dibujarla manualmente.
 
 ## Primeros experimentos
 
 ### 1 — Cambia la amplitud
 
 ```js
-amplitud: 5.0
+amplitud: 3.0
 ```
 
 ### 2 — Cambia la frecuencia
 
 ```js
-frecuencia: 0.15
+frecuencia: 1.0
 ```
 
 ### 3 — Cambia la regla
 
-Dentro de `calcularAlturaModulo()`, reemplaza:
+Dentro de `CurvaVarilla.getPoint()`, reemplaza:
 
 ```js
-Math.sin(distancia * parametros.frecuencia)
+Math.sin(t * Math.PI * parametros.frecuencia * 3.0)
 ```
 
 por:
 
 ```js
-Math.cos(distancia * parametros.frecuencia)
+Math.cos(t * Math.PI * parametros.frecuencia * 3.0)
 ```
 
-### 4 — Haz que la altura dependa de X
+### 4 — Cambia la cantidad de varillas
 
 ```js
-const onda =
-  Math.sin(x * parametros.frecuencia) *
-  parametros.amplitud;
+columnas: 24
 ```
 
 ### 5 — Prueba aleatoriedad + semilla
@@ -131,4 +133,4 @@ queda preparada para una etapa posterior donde `BoxGeometry` podrá reemplazarse
 
 ## Pregunta guía
 
-> **¿Qué cambia cuando dejamos de diseñar una forma y comenzamos a diseñar las reglas que producen formas?**
+> **¿Qué relaciones entre luz, estructura y variación producen una lámpara?**
