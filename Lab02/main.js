@@ -1,3 +1,4 @@
+import { STLExporter } from "three/addons/exporters/STLExporter.js";
 import * as THREE from "three";
 import { OrbitControls } from "three/addons/controls/OrbitControls.js";
 
@@ -163,45 +164,64 @@ class CurvaVarilla extends THREE.Curve {
 // 05 — GENERAR CAMPO
 // ======================================================
 
-// Función que crea la tapa plana uniendo los vértices finales del tubo
-function taparExtremoTubo(tuboGeo, lados, segmentosTubo) {
+// Función que sella tanto la tapa inferior (t=0) como la superior (t=1)
+function taparExtremosTubo(tuboGeo, lados, segmentosTubo) {
   const pos = tuboGeo.attributes.position;
   const verticesTubo = [];
 
-  // Extraer las coordenadas originales del tubo
   for (let i = 0; i < pos.count; i++) {
     verticesTubo.push(pos.getX(i), pos.getY(i), pos.getZ(i));
   }
 
-  // Los vértices del aro final del tubo están en el último segmento
-  const inicioAroFinal = segmentosTubo * (lados + 1);
-
-  // Calcular el centro exacto del aro final
-  let centroX = 0, centroY = 0, centroZ = 0;
-  for (let j = 0; j < lados; j++) {
-    const idx = inicioAroFinal + j;
-    centroX += pos.getX(idx);
-    centroY += pos.getY(idx);
-    centroZ += pos.getZ(idx);
-  }
-  centroX /= lados;
-  centroY /= lados;
-  centroZ /= lados;
-
-  // Agregar el vértice central
-  const indiceCentro = verticesTubo.length / 3;
-  verticesTubo.push(centroX, centroY, centroZ);
-
-  // Reconstruir índices incluyendo los triángulos de la tapa
   const indicesOriginales = Array.from(tuboGeo.index.array);
 
+  // 1. TAPA INFERIOR (Inicio del tubo, t = 0)
+  const inicioAroInferior = 0;
+  let centroInfX = 0, centroInfY = 0, centroInfZ = 0;
+
   for (let j = 0; j < lados; j++) {
-    const v1 = inicioAroFinal + j;
-    const v2 = inicioAroFinal + ((j + 1) % (lados + 1));
-    indicesOriginales.push(indiceCentro, v1, v2);
+    const idx = inicioAroInferior + j;
+    centroInfX += pos.getX(idx);
+    centroInfY += pos.getY(idx);
+    centroInfZ += pos.getZ(idx);
+  }
+  centroInfX /= lados;
+  centroInfY /= lados;
+  centroInfZ /= lados;
+
+  const indiceCentroInf = verticesTubo.length / 3;
+  verticesTubo.push(centroInfX, centroInfY, centroInfZ);
+
+  for (let j = 0; j < lados; j++) {
+    const v1 = inicioAroInferior + j;
+    const v2 = inicioAroInferior + ((j + 1) % (lados + 1));
+    indicesOriginales.push(indiceCentroInf, v2, v1);
   }
 
-  // Crear la nueva geometría sellada
+  // 2. TAPA SUPERIOR (Punta del tubo, t = 1)
+  const inicioAroSuperior = segmentosTubo * (lados + 1);
+  let centroSupX = 0, centroSupY = 0, centroSupZ = 0;
+
+  for (let j = 0; j < lados; j++) {
+    const idx = inicioAroSuperior + j;
+    centroSupX += pos.getX(idx);
+    centroSupY += pos.getY(idx);
+    centroSupZ += pos.getZ(idx);
+  }
+  centroSupX /= lados;
+  centroSupY /= lados;
+  centroSupZ /= lados;
+
+  const indiceCentroSup = verticesTubo.length / 3;
+  verticesTubo.push(centroSupX, centroSupY, centroSupZ);
+
+  for (let j = 0; j < lados; j++) {
+    const v1 = inicioAroSuperior + j;
+    const v2 = inicioAroSuperior + ((j + 1) % (lados + 1));
+    indicesOriginales.push(indiceCentroSup, v1, v2);
+  }
+
+  // Geometría hermética cerrada
   const geoSellada = new THREE.BufferGeometry();
   geoSellada.setAttribute(
     "position",
@@ -235,8 +255,8 @@ function generarCampo() {
       false
     );
 
-    // 2. Sellar la punta superior con una tapa sólida
-    const geoTapada = taparExtremoTubo(geometriaTubo, parametros.lados, segmentosTubo);
+    // 2. Sellar ambos extremos (base y punta)
+    const geoTapada = taparExtremosTubo(geometriaTubo, parametros.lados, segmentosTubo);
 
     // 3. Facetado con caras planas limpias
     const geoPlana = geoTapada.toNonIndexed();
@@ -279,7 +299,7 @@ function aleatoriedadConSemilla(x, z, semilla) {
 }
 
 // ======================================================
-// 07 — INTERFAZ
+// 07 — INTERFAZ Y EXPORTACIÓN
 // ======================================================
 
 const controles = {
@@ -357,6 +377,29 @@ document.querySelector("#restablecer").addEventListener("click", () => {
 
   generarCampo();
 });
+
+// Descargar STL con Base + Varillas sólidas (excluye la bombilla visual)
+const botonDescargar = document.querySelector("#descargar-stl");
+
+if (botonDescargar) {
+  botonDescargar.addEventListener("click", () => {
+    const exporter = new STLExporter();
+    
+    // Grupo que solo suma la base física y los fideos
+    const modeloCompleto = new THREE.Group();
+    modeloCompleto.add(baseLampara.clone());
+    modeloCompleto.add(grupoCampo.clone());
+
+    const stlData = exporter.parse(modeloCompleto, { binary: true });
+
+    const blob = new Blob([stlData], { type: "application/octet-stream" });
+    const link = document.createElement("a");
+    link.href = URL.createObjectURL(blob);
+    link.download = `lampara-completa-lados-${parametros.lados}-semilla-${parametros.semilla}.stl`;
+    link.click();
+    URL.revokeObjectURL(link.href);
+  });
+}
 
 // ======================================================
 // 08 — BUCLE DE ANIMACIÓN
