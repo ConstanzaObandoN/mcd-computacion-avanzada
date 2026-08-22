@@ -1,14 +1,14 @@
 [
-  {"id":"calgary-foothills","name":"Foothills Medical Centre","city":"Calgary","lat":51.064610,"lon":-114.132790,"wait_time_minutes":198},
-  {"id":"calgary-peter-lougheed","name":"Peter Lougheed Centre","city":"Calgary","lat":51.073760,"lon":-113.981660,"wait_time_minutes":82},
-  {"id":"calgary-rockyview","name":"Rockyview General Hospital","city":"Calgary","lat":50.991590,"lon":-114.097170,"wait_time_minutes":236},
-  {"id":"calgary-south-health","name":"South Health Campus","city":"Calgary","lat":50.879670,"lon":-113.956110,"wait_time_minutes":47},
-  {"id":"calgary-alberta-childrens","name":"Alberta Children's Hospital","city":"Calgary","lat":51.074180,"lon":-114.146170,"wait_time_minutes":126},
-  {"id":"calgary-sheldon-chumir","name":"Sheldon M. Chumir Health Centre","city":"Calgary","lat":51.045560,"lon":-114.066790,"wait_time_minutes":64},
-  {"id":"edmonton-royal-alexandra","name":"Royal Alexandra Hospital","city":"Edmonton","lat":53.560380,"lon":-113.493060,"wait_time_minutes":214},
-  {"id":"edmonton-university-alberta","name":"University of Alberta Hospital","city":"Edmonton","lat":53.520740,"lon":-113.526830,"wait_time_minutes":157},
-  {"id":"edmonton-grey-nuns","name":"Grey Nuns Community Hospital","city":"Edmonton","lat":53.437050,"lon":-113.476740,"wait_time_minutes":73},
-  {"id":"edmonton-misericordia","name":"Misericordia Community Hospital","city":"Edmonton","lat":53.507460,"lon":-113.631570,"wait_time_minutes":188},
-  {"id":"edmonton-stollery","name":"Stollery Children's Hospital","city":"Edmonton","lat":53.521330,"lon":-113.526550,"wait_time_minutes":54},
-  {"id":"edmonton-northeast","name":"Northeast Community Health Centre","city":"Edmonton","lat":53.597900,"lon":-113.427230,"wait_time_minutes":109}
+  {"id":"calgary-foothills","name":"Foothills Medical Centre","city":"Calgary","lat":51.064610,"lon":-114.132790,"wait_time_minutes":198,"patients_waiting":79,"capacity":96},
+  {"id":"calgary-peter-lougheed","name":"Peter Lougheed Centre","city":"Calgary","lat":51.073760,"lon":-113.981660,"wait_time_minutes":82,"patients_waiting":36,"capacity":74},
+  {"id":"calgary-rockyview","name":"Rockyview General Hospital","city":"Calgary","lat":50.991590,"lon":-114.097170,"wait_time_minutes":236,"patients_waiting":87,"capacity":102},
+  {"id":"calgary-south-health","name":"South Health Campus","city":"Calgary","lat":50.879670,"lon":-113.956110,"wait_time_minutes":47,"patients_waiting":18,"capacity":68},
+  {"id":"calgary-alberta-childrens","name":"Alberta Children's Hospital","city":"Calgary","lat":51.074180,"lon":-114.146170,"wait_time_minutes":126,"patients_waiting":49,"capacity":82},
+  {"id":"calgary-sheldon-chumir","name":"Sheldon M. Chumir Health Centre","city":"Calgary","lat":51.045560,"lon":-114.066790,"wait_time_minutes":64,"patients_waiting":28,"capacity":54},
+  {"id":"edmonton-royal-alexandra","name":"Royal Alexandra Hospital","city":"Edmonton","lat":53.560380,"lon":-113.493060,"wait_time_minutes":214,"patients_waiting":84,"capacity":98},
+  {"id":"edmonton-university-alberta","name":"University of Alberta Hospital","city":"Edmonton","lat":53.520740,"lon":-113.526830,"wait_time_minutes":157,"patients_waiting":58,"capacity":91},
+  {"id":"edmonton-grey-nuns","name":"Grey Nuns Community Hospital","city":"Edmonton","lat":53.437050,"lon":-113.476740,"wait_time_minutes":73,"patients_waiting":31,"capacity":63},
+  {"id":"edmonton-misericordia","name":"Misericordia Community Hospital","city":"Edmonton","lat":53.507460,"lon":-113.631570,"wait_time_minutes":188,"patients_waiting":67,"capacity":80},
+  {"id":"edmonton-stollery","name":"Stollery Children's Hospital","city":"Edmonton","lat":53.521330,"lon":-113.526550,"wait_time_minutes":54,"patients_waiting":20,"capacity":59},
+  {"id":"edmonton-northeast","name":"Northeast Community Health Centre","city":"Edmonton","lat":53.597900,"lon":-113.427230,"wait_time_minutes":109,"patients_waiting":43,"capacity":70}
 ]

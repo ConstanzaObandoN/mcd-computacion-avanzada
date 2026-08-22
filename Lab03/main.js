@@ -20,6 +20,8 @@ const SATELLITE_STYLE = {
 let map;
 let hospitals = [];
 let pulsePhase = 0;
+let activeCity = "all";
+let selectedHospitalId = null;
 
 async function init() {
   const message = document.querySelector("#map-message");
@@ -49,6 +51,7 @@ async function init() {
       if (!response.ok) throw new Error("No se pudo cargar hospitals.json");
       hospitals = await response.json();
       addHospitalLayers();
+      updateNetworkStress();
       updateTimestamp();
       setInterval(simulateWaitTimes, 4000);
       setInterval(animateCriticalPulse, 70);
@@ -86,6 +89,8 @@ function hospitalsToGeoJSON() {
         name: hospital.name,
         city: hospital.city,
         wait_time_minutes: hospital.wait_time_minutes,
+        patients_waiting: hospital.patients_waiting,
+        capacity: hospital.capacity,
         status: getStatus(hospital.wait_time_minutes).key,
         pulse: pulsePhase,
       },
@@ -114,6 +119,11 @@ function addHospitalLayers() {
     id: "hospital-circles", type: "circle", source: "hospitals", minzoom: 3, maxzoom: 18,
     paint: { "circle-color": color, "circle-radius": radius, "circle-stroke-width": 2, "circle-stroke-color": "#ffffff", "circle-stroke-opacity": 0.9 },
   });
+  map.addLayer({
+    id: "hospital-highlight", type: "circle", source: "hospitals", minzoom: 3, maxzoom: 18,
+    filter: ["==", ["get", "id"], ""],
+    paint: { "circle-color": "#ffffff", "circle-radius": ["+", radius, 10], "circle-opacity": 0.15, "circle-stroke-width": 3, "circle-stroke-color": "#ffffff", "circle-stroke-opacity": 0.95 },
+  });
 
   map.on("click", "hospital-circles", openPopup);
   map.on("mouseenter", "hospital-circles", () => { map.getCanvas().style.cursor = "pointer"; });
@@ -122,15 +132,13 @@ function addHospitalLayers() {
 
 function openPopup(event) {
   const feature = event.features[0];
-  const { name, city, wait_time_minutes: wait } = feature.properties;
-  const status = getStatus(Number(wait));
-  new maplibregl.Popup({ offset: 18, closeButton: true, maxWidth: "280px" })
-    .setLngLat(feature.geometry.coordinates)
-    .setHTML(`<article class="info-card ${status.key}"><p class="info-kicker">${city}</p><h2>${name}</h2><p class="info-wait">${formatWait(Number(wait))}</p><p class="info-status"><i></i>${status.label}</p></article>`)
-    .addTo(map);
+  const hospital = hospitals.find((item) => item.id === feature.properties.id);
+  showInspector(hospital);
+  highlightHospital(hospital.id);
 }
 
 function applyCityView(city) {
+  activeCity = city;
   const cityFilter = city === "all" ? null : ["==", ["get", "city"], city];
   const pulseFilter = city === "all"
     ? ["==", ["get", "status"], "critical"]
@@ -138,6 +146,7 @@ function applyCityView(city) {
   map.setFilter("hospital-circles", cityFilter);
   map.setFilter("hospital-pulse", pulseFilter);
   map.flyTo({ ...CITY_VIEWS[city], duration: 1750, essential: true });
+  updateNetworkStress();
 }
 
 function refreshHospitalSource() {
@@ -149,6 +158,8 @@ function simulateWaitTimes() {
     hospital.wait_time_minutes = Math.max(15, Math.min(285, hospital.wait_time_minutes + Math.floor(Math.random() * 19) - 9));
   });
   refreshHospitalSource();
+  if (selectedHospitalId) showInspector(hospitals.find((hospital) => hospital.id === selectedHospitalId));
+  updateNetworkStress();
   updateTimestamp();
 }
 
@@ -161,5 +172,56 @@ function updateTimestamp() {
   document.querySelector("#last-update").textContent = new Date().toLocaleTimeString("es-CL", { hour: "2-digit", minute: "2-digit", second: "2-digit" });
 }
 
+function visibleHospitals() {
+  return hospitals.filter((hospital) => activeCity === "all" || hospital.city === activeCity);
+}
+
+function updateNetworkStress() {
+  const visible = visibleHospitals();
+  if (!visible.length) return;
+  const averageWait = visible.reduce((total, hospital) => total + hospital.wait_time_minutes, 0) / visible.length;
+  const percent = Math.round(Math.min(100, (averageWait / 240) * 100));
+  const status = percent >= 60 ? "critical" : percent >= 25 ? "moderate" : "optimal";
+  const label = status === "critical" ? "Crítico" : status === "moderate" ? "Moderado" : "Óptimo";
+  const badge = document.querySelector("#network-stress");
+  badge.className = `stress-badge ${status}`;
+  badge.textContent = `Estrés de la Red: ${label} (${percent}%)`;
+}
+
+function highlightHospital(id) {
+  map.setFilter("hospital-highlight", ["==", ["get", "id"], id]);
+}
+
+function showInspector(hospital) {
+  selectedHospitalId = hospital.id;
+  const status = getStatus(hospital.wait_time_minutes);
+  const ratio = Math.min(100, Math.round((hospital.patients_waiting / hospital.capacity) * 100));
+  document.querySelector("#inspector-city").textContent = hospital.city;
+  document.querySelector("#inspector-name").textContent = hospital.name;
+  document.querySelector("#inspector-wait").textContent = formatWait(hospital.wait_time_minutes);
+  const state = document.querySelector("#inspector-status");
+  state.className = `inspector-status ${status.key}`;
+  state.textContent = status.label;
+  document.querySelector("#inspector-patients").textContent = hospital.patients_waiting;
+  document.querySelector("#inspector-capacity").textContent = hospital.capacity;
+  document.querySelector("#capacity-fill").className = status.key;
+  document.querySelector("#capacity-fill").style.width = `${ratio}%`;
+  document.querySelector("#inspector").hidden = false;
+}
+
+function recommendOptimalCenter() {
+  const best = [...visibleHospitals()].sort((a, b) => a.wait_time_minutes - b.wait_time_minutes)[0];
+  if (!best) return;
+  highlightHospital(best.id);
+  showInspector(best);
+  map.flyTo({ center: [best.lon, best.lat], zoom: 14, pitch: 58, bearing: 24, duration: 1900, essential: true });
+}
+
 document.querySelector("#city-filter").addEventListener("change", (event) => applyCityView(event.target.value));
+document.querySelector("#recommend-button").addEventListener("click", recommendOptimalCenter);
+document.querySelector("#close-inspector").addEventListener("click", () => {
+  document.querySelector("#inspector").hidden = true;
+  selectedHospitalId = null;
+  map.setFilter("hospital-highlight", ["==", ["get", "id"], ""]);
+});
 init();
