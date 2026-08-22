@@ -383,21 +383,33 @@ const botonDescargar = document.querySelector("#descargar-stl");
 
 if (botonDescargar) {
   botonDescargar.addEventListener("click", () => {
-    const exporter = new STLExporter();
-    
-    // Grupo que solo suma la base física y los fideos
-    const modeloCompleto = new THREE.Group();
-    modeloCompleto.add(baseLampara.clone());
-    modeloCompleto.add(grupoCampo.clone());
+    try {
+      const exporter = new STLExporter();
 
-    const stlData = exporter.parse(modeloCompleto, { binary: true });
+      const modeloCompleto = new THREE.Group();
+      modeloCompleto.add(baseLampara.clone());
+      modeloCompleto.add(grupoCampo.clone());
 
-    const blob = new Blob([stlData], { type: "application/octet-stream" });
-    const link = document.createElement("a");
-    link.href = URL.createObjectURL(blob);
-    link.download = `lampara-completa-lados-${parametros.lados}-semilla-${parametros.semilla}.stl`;
-    link.click();
-    URL.revokeObjectURL(link.href);
+      const stlData = exporter.parse(modeloCompleto, { binary: true });
+
+      const blob = new Blob([stlData], { type: "application/octet-stream" });
+      const url = URL.createObjectURL(blob);
+
+      const link = document.createElement("a");
+      link.href = url;
+      link.download = `lampara-completa-lados-${parametros.lados}-semilla-${parametros.semilla}.stl`;
+      link.style.display = "none";
+
+      document.body.appendChild(link);
+      link.click();
+
+      setTimeout(() => {
+        document.body.removeChild(link);
+        URL.revokeObjectURL(url);
+      }, 250);
+    } catch (error) {
+      console.error("Error al exportar STL:", error);
+    }
   });
 }
 
