@@ -9,6 +9,12 @@ a:hover { color: var(--accent); }
 .eyebrow { margin: 0 0 .75rem; color: var(--accent); font-size: .72rem; font-weight: 700; letter-spacing: .16em; }
 h1, h2 { font-weight: 400; letter-spacing: -.035em; }
 h1 { margin: 0; font-size: clamp(3rem, 8vw, 6.5rem); line-height: .95; }
+.glitter-name { position: relative; display: inline-block; color: #e8e8e8; isolation: isolate; }
+.glitter-name span { position: relative; z-index: 1; background: linear-gradient(110deg, #a6a6a6 0%, #fdfdfd 26%, #b7b7b7 46%, #fff 57%, #8f8f8f 78%, #e8e8e8 100%); background-size: 220% 100%; -webkit-background-clip: text; background-clip: text; color: transparent; text-shadow: 0 0 .6em rgb(255 255 255 / .12); transition: background-position .6s ease, text-shadow .35s ease; }
+.glitter-name::after { content: ""; position: absolute; z-index: 0; inset: -.16em -.08em; pointer-events: none; opacity: .38; background-image: radial-gradient(circle, #fff 0 .025em, transparent .045em), radial-gradient(circle, #d7d7d7 0 .018em, transparent .038em), radial-gradient(circle, #fff 0 .014em, transparent .032em); background-position: 8% 32%, 72% 18%, 48% 76%; background-size: .7em .7em, 1.05em 1.05em, .52em .52em; transition: opacity .25s ease, background-size .35s ease; }
+.glitter-name:hover span { background-position: 100% 0; text-shadow: 0 0 .45em rgb(255 255 255 / .38), 0 0 1.1em rgb(218 218 218 / .2); }
+.glitter-name:hover::after { opacity: .95; background-size: .4em .4em, .62em .62em, .3em .3em; animation: glitter-twinkle .7s steps(2, end) infinite; }
+@keyframes glitter-twinkle { 50% { filter: brightness(1.8); transform: translateX(.02em); } }
 h2 { margin: 0 0 1.25rem; font-size: clamp(1.55rem, 3vw, 2.35rem); line-height: 1.05; }
 .intro { max-width: 620px; margin: 1.5rem 0 0; color: var(--muted); font-size: clamp(1.05rem, 2vw, 1.3rem); }
 .profile-grid { display: grid; grid-template-columns: minmax(0, 1.1fr) minmax(260px, .9fr); gap: clamp(2.5rem, 7vw, 7rem); padding: 4rem 0; }
@@ -26,3 +32,4 @@ model-viewer { display: block; width: 100%; height: min(66vw, 620px); min-height
 model-viewer p { padding: 1rem; color: #191919; }
 .links-section ul { padding-left: 1.2rem; } .links-section li + li { margin-top: .8rem; }
 @media (max-width: 700px) { .site-shell { width: min(100% - 2rem, 1120px); padding-top: 3.5rem; } .profile-grid { grid-template-columns: 1fr; } figure { max-width: 430px; } model-viewer { min-height: 320px; } }
+@media (prefers-reduced-motion: reduce) { .glitter-name span, .glitter-name::after { transition: none; animation: none; } }

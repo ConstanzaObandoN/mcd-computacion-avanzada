@@ -1,534 +1,165 @@
-import * as THREE from "three";
-import { OrbitControls } from "three/addons/controls/OrbitControls.js";
-
-// ======================================================
-// 01 — CONFIGURACIÓN
-// ======================================================
-// Usamos un feed GBFS público de Citi Bike (Nueva York).
-// station_information describe dónde están las estaciones y su capacidad.
-// station_status describe su estado actual: bicicletas y anclajes disponibles.
-
-const URL_INFO =
-  "https://gbfs.lyft.com/gbfs/2.3/bkn/es/station_information.json";
-
-const URL_ESTADO =
-  "https://gbfs.lyft.com/gbfs/2.3/bkn/es/station_status.json";
-
-const INTERVALO_ACTUALIZACION = 15; // segundos.
-
-const parametros = {
-  modo: "geografico",
-  escalaAltura: 0.15,
-  escalaAncho: 0.5,
-  cantidad: 80,
+const CITY_VIEWS = {
+  all: { center: [-113.82, 52.36], zoom: 6.5, pitch: 32, bearing: 8 },
+  Calgary: { center: [-114.0719, 51.0447], zoom: 10.7, pitch: 50, bearing: 18 },
+  Edmonton: { center: [-113.4938, 53.5461], zoom: 10.6, pitch: 50, bearing: -16 },
 };
 
-let actualizacionAutomatica = true;
-let segundosRestantes = INTERVALO_ACTUALIZACION;
-let estaciones = [];
-let objetosEstacion = [];
+const SATELLITE_STYLE = {
+  version: 8,
+  sources: {
+    esriWorldImagery: {
+      type: "raster",
+      tiles: ["https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}"],
+      tileSize: 256,
+      attribution: "Tiles © Esri — Source: Esri, Maxar, Earthstar Geographics, and the GIS User Community",
+    },
+  },
+  layers: [{ id: "esri-satellite", type: "raster", source: "esriWorldImagery" }],
+};
 
-// ======================================================
-// 02 — ESCENA
-// ======================================================
+let map;
+let hospitals = [];
+let pulsePhase = 0;
 
-const viewport = document.querySelector("#viewport");
-const escena = new THREE.Scene();
-escena.background = new THREE.Color(0x0b0b0c);
+async function init() {
+  const message = document.querySelector("#map-message");
+  if (!window.maplibregl) {
+    message.hidden = false;
+    message.textContent = "No se pudo cargar MapLibre GL JS. Comprueba tu conexión a internet.";
+    return;
+  }
 
-const camara = new THREE.PerspectiveCamera(
-  42,
-  viewport.clientWidth / viewport.clientHeight,
-  0.1,
-  300
-);
-camara.position.set(18, 46, 24);
+  map = new maplibregl.Map({
+    container: "map",
+    style: SATELLITE_STYLE,
+    ...CITY_VIEWS.all,
+    minZoom: 3,
+    maxZoom: 18,
+    maxPitch: 75,
+    dragRotate: true,
+    pitchWithRotate: true,
+    touchPitch: true,
+    attributionControl: true,
+  });
+  map.addControl(new maplibregl.NavigationControl({ visualizePitch: true }), "bottom-right");
 
-const renderer = new THREE.WebGLRenderer({ antialias: true });
-renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
-renderer.setSize(viewport.clientWidth, viewport.clientHeight);
-renderer.shadowMap.enabled = true;
-renderer.shadowMap.type = THREE.PCFSoftShadowMap;
-renderer.outputColorSpace = THREE.SRGBColorSpace;
-viewport.appendChild(renderer.domElement);
-
-const controlesOrbita = new OrbitControls(camara, renderer.domElement);
-controlesOrbita.enableDamping = true;
-controlesOrbita.target.set(0, 2, 0);
-
-escena.add(new THREE.HemisphereLight(0xf2eee4, 0x1f2228, 1.8));
-
-const luzPrincipal = new THREE.DirectionalLight(0xffffff, 2.7);
-luzPrincipal.position.set(18, 28, 14);
-luzPrincipal.castShadow = true;
-escena.add(luzPrincipal);
-
-const suelo = new THREE.Mesh(
-  new THREE.PlaneGeometry(90, 90),
-  new THREE.MeshStandardMaterial({ color: 0x101114, roughness: 1 })
-);
-suelo.rotation.x = -Math.PI / 2;
-suelo.position.y = -0.02;
-suelo.receiveShadow = true;
-escena.add(suelo);
-
-const grilla = new THREE.GridHelper(70, 70, 0x34383d, 0x1e2024);
-grilla.position.y = 0.001;
-escena.add(grilla);
-
-const grupoEstaciones = new THREE.Group();
-escena.add(grupoEstaciones);
-
-const grupoBaseGeografica = new THREE.Group();
-escena.add(grupoBaseGeografica);
-
-// ======================================================
-// 03 — DATOS: FETCH + FALLBACK
-// ======================================================
-
-async function cargarDatosVivos() {
-  actualizarEstadoConexion("conectando");
-
-  try {
-    // Dos fuentes del mismo sistema:
-    // 1) información espacial y capacidad
-    // 2) estado operativo actual
-    const [respuestaInfo, respuestaEstado] = await Promise.all([
-      fetch(URL_INFO, { cache: "no-store" }),
-      fetch(URL_ESTADO, { cache: "no-store" }),
-    ]);
-
-    if (!respuestaInfo.ok || !respuestaEstado.ok) {
-      throw new Error("La API respondió con un estado no válido.");
+  map.on("load", async () => {
+    try {
+      const response = await fetch("./hospitals.json");
+      if (!response.ok) throw new Error("No se pudo cargar hospitals.json");
+      hospitals = await response.json();
+      addHospitalLayers();
+      updateTimestamp();
+      setInterval(simulateWaitTimes, 4000);
+      setInterval(animateCriticalPulse, 70);
+    } catch (error) {
+      console.error(error);
+      message.hidden = false;
+      message.textContent = "No fue posible cargar los datos locales de hospitales.";
     }
-
-    const info = await respuestaInfo.json();
-    const estado = await respuestaEstado.json();
-
-    estaciones = combinarFeedsGBFS(info, estado);
-    actualizarEstadoConexion("vivo");
-    document.querySelector("#fuente-label").textContent = "Citi Bike · GBFS";
-    document.querySelector("#actualizacion-label").textContent =
-      formatearHora(estado.last_updated);
-
-    generarRepresentacion();
-  } catch (error) {
-    console.warn("No fue posible usar el feed vivo. Se utilizará el dataset local.", error);
-    await cargarRespaldoLocal();
-  }
-}
-
-async function cargarRespaldoLocal() {
-  const respuesta = await fetch("./assets/data/movilidad-respaldo.json");
-  const datos = await respuesta.json();
-
-  estaciones = datos.estaciones;
-  actualizarEstadoConexion("respaldo");
-  document.querySelector("#fuente-label").textContent = "Dataset local · respaldo";
-  document.querySelector("#actualizacion-label").textContent = "archivo local";
-
-  generarRepresentacion();
-}
-
-function combinarFeedsGBFS(info, estado) {
-  // station_id es la llave que permite unir ambos feeds.
-  const estadosPorId = new Map(
-    estado.data.stations.map((estacion) => [estacion.station_id, estacion])
-  );
-
-  return info.data.stations
-    .map((estacionInfo) => {
-      const estacionEstado = estadosPorId.get(estacionInfo.station_id);
-      if (!estacionEstado) return null;
-
-      const capacidad = estacionInfo.capacity ?? 0;
-      const bicicletas = estacionEstado.num_bikes_available ?? 0;
-      const anclajesLibres = estacionEstado.num_docks_available ?? 0;
-
-      return {
-        id: estacionInfo.station_id,
-        nombre: estacionInfo.name,
-        lat: estacionInfo.lat,
-        lon: estacionInfo.lon,
-        capacidad,
-        bicicletas,
-        anclajes_libres: anclajesLibres,
-      };
-    })
-    .filter(Boolean)
-    .filter((estacion) => estacion.capacidad > 0);
-}
-
-// ======================================================
-// 04 — REGLAS: INPUT → RELACIÓN → OUTPUT
-// ======================================================
-
-function calcularOcupacion(estacion) {
-  return estacion.capacidad > 0
-    ? estacion.bicicletas / estacion.capacidad
-    : 0;
-}
-
-function proyectarGeograficamente(estacionesSeleccionadas) {
-  // No construimos un mapa cartográfico exacto.
-  // Para este LAB hacemos una proyección local simple:
-  // longitud → X, latitud → Z.
-  const latitudes = estacionesSeleccionadas.map((e) => e.lat);
-  const longitudes = estacionesSeleccionadas.map((e) => e.lon);
-
-  const latCentro = (Math.min(...latitudes) + Math.max(...latitudes)) / 2;
-  const lonCentro = (Math.min(...longitudes) + Math.max(...longitudes)) / 2;
-
-  return estacionesSeleccionadas.map((estacion) => ({
-    ...estacion,
-    x: (estacion.lon - lonCentro) * 150,
-    z: -(estacion.lat - latCentro) * 150,
-  }));
-}
-
-function ordenarPorOcupacion(estacionesSeleccionadas) {
-  const ordenadas = [...estacionesSeleccionadas].sort(
-    (a, b) => calcularOcupacion(b) - calcularOcupacion(a)
-  );
-
-  const columnas = Math.ceil(Math.sqrt(ordenadas.length));
-  const separacion = 2.0;
-
-  return ordenadas.map((estacion, indice) => {
-    const columna = indice % columnas;
-    const fila = Math.floor(indice / columnas);
-
-    return {
-      ...estacion,
-      x: (columna - columnas / 2) * separacion,
-      z: (fila - columnas / 2) * separacion,
-    };
   });
+  map.on("error", (event) => console.warn("MapLibre:", event.error));
 }
 
-function generarRepresentacion() {
-  limpiarRepresentacion();
-
-  const seleccion = seleccionarEstaciones(estaciones, parametros.cantidad);
-
-  const distribuidas =
-    parametros.modo === "geografico"
-      ? proyectarGeograficamente(seleccion)
-      : ordenarPorOcupacion(seleccion);
-
-  actualizarBaseGeografica(distribuidas);
-  distribuidas.forEach(crearModuloEstacion);
+function getStatus(minutes) {
+  if (minutes < 60) return { key: "optimal", label: "Estado óptimo" };
+  if (minutes <= 180) return { key: "moderate", label: "Demanda moderada" };
+  return { key: "critical", label: "Saturación crítica" };
 }
 
-function seleccionarEstaciones(lista, cantidad) {
-  // Elegimos un conjunto estable y suficientemente representativo.
-  // Ordenar por capacidad evita que el subconjunto dependa del orden arbitrario del feed.
-  return [...lista]
-    .sort((a, b) => b.capacidad - a.capacidad)
-    .slice(0, cantidad);
+function formatWait(minutes) {
+  const hours = Math.floor(minutes / 60);
+  const remainder = minutes % 60;
+  return hours ? `${hours} h ${remainder ? `${remainder} min` : ""}`.trim() : `${remainder} min`;
 }
 
-function crearModuloEstacion(estacion) {
-  const ocupacion = calcularOcupacion(estacion);
+// GeoJSON y MapLibre usan siempre [longitud, latitud].
+function hospitalsToGeoJSON() {
+  return {
+    type: "FeatureCollection",
+    features: hospitals.map((hospital) => ({
+      type: "Feature",
+      id: hospital.id,
+      geometry: { type: "Point", coordinates: [hospital.lon, hospital.lat] },
+      properties: {
+        id: hospital.id,
+        name: hospital.name,
+        city: hospital.city,
+        wait_time_minutes: hospital.wait_time_minutes,
+        status: getStatus(hospital.wait_time_minutes).key,
+        pulse: pulsePhase,
+      },
+    })),
+  };
+}
 
-  // REGLA 1:
-  // capacidad total → altura total del contenedor.
-  const alturaTotal =
-    Math.max(1.4, estacion.capacidad * parametros.escalaAltura);
+function addHospitalLayers() {
+  map.addSource("hospitals", { type: "geojson", data: hospitalsToGeoJSON() });
+  const radius = ["interpolate", ["linear"], ["get", "wait_time_minutes"], 0, 7, 60, 11, 180, 17, 285, 24];
+  const color = ["match", ["get", "status"], "optimal", "#63d49a", "moderate", "#ffbd4a", "critical", "#ff5a61", "#ffffff"];
 
-  // REGLA 2:
-  // bicicletas disponibles → fracción llena.
-  const alturaBicicletas = Math.max(0.08, alturaTotal * ocupacion);
-
-  // REGLA 3:
-  // porcentaje de ocupación → ancho del módulo.
-  const ancho =
-    (0.55 + ocupacion * 0.75) *
-    parametros.escalaAncho;
-
-  const grupo = new THREE.Group();
-  grupo.position.set(estacion.x, 0, estacion.z);
-  grupo.userData.estacion = estacion;
-
-  // Contenedor: representa la capacidad total.
-  const geometriaCapacidad = new THREE.BoxGeometry(ancho, alturaTotal, ancho);
-  const materialCapacidad = new THREE.MeshStandardMaterial({
-    color: 0x34383e,
-    roughness: 0.9,
-    transparent: true,
-    opacity: 0.55,
+  map.addLayer({
+    id: "hospital-pulse", type: "circle", source: "hospitals", minzoom: 3, maxzoom: 18,
+    filter: ["==", ["get", "status"], "critical"],
+    paint: {
+      "circle-color": "#ff5a61",
+      "circle-radius": ["+", radius, ["*", ["get", "pulse"], 25]],
+      "circle-opacity": ["-", 0.62, ["*", ["get", "pulse"], 0.62]],
+      "circle-stroke-width": 1.5,
+      "circle-stroke-color": "#ff5a61",
+      "circle-stroke-opacity": ["-", 0.55, ["*", ["get", "pulse"], 0.55]],
+    },
+  });
+  map.addLayer({
+    id: "hospital-circles", type: "circle", source: "hospitals", minzoom: 3, maxzoom: 18,
+    paint: { "circle-color": color, "circle-radius": radius, "circle-stroke-width": 2, "circle-stroke-color": "#ffffff", "circle-stroke-opacity": 0.9 },
   });
 
-  const capacidad = new THREE.Mesh(geometriaCapacidad, materialCapacidad);
-  capacidad.position.y = alturaTotal / 2;
-  capacidad.userData.estacion = estacion;
-  grupo.add(capacidad);
+  map.on("click", "hospital-circles", openPopup);
+  map.on("mouseenter", "hospital-circles", () => { map.getCanvas().style.cursor = "pointer"; });
+  map.on("mouseleave", "hospital-circles", () => { map.getCanvas().style.cursor = ""; });
+}
 
-  // Volumen claro: representa las bicicletas actualmente disponibles.
-  const geometriaBicicletas = new THREE.BoxGeometry(
-    ancho * 0.72,
-    alturaBicicletas,
-    ancho * 0.72
-  );
-  const materialBicicletas = new THREE.MeshStandardMaterial({
-    color: 0xddd7ca,
-    roughness: 0.5,
+function openPopup(event) {
+  const feature = event.features[0];
+  const { name, city, wait_time_minutes: wait } = feature.properties;
+  const status = getStatus(Number(wait));
+  new maplibregl.Popup({ offset: 18, closeButton: true, maxWidth: "280px" })
+    .setLngLat(feature.geometry.coordinates)
+    .setHTML(`<article class="info-card ${status.key}"><p class="info-kicker">${city}</p><h2>${name}</h2><p class="info-wait">${formatWait(Number(wait))}</p><p class="info-status"><i></i>${status.label}</p></article>`)
+    .addTo(map);
+}
+
+function applyCityView(city) {
+  const cityFilter = city === "all" ? null : ["==", ["get", "city"], city];
+  const pulseFilter = city === "all"
+    ? ["==", ["get", "status"], "critical"]
+    : ["all", ["==", ["get", "status"], "critical"], cityFilter];
+  map.setFilter("hospital-circles", cityFilter);
+  map.setFilter("hospital-pulse", pulseFilter);
+  map.flyTo({ ...CITY_VIEWS[city], duration: 1750, essential: true });
+}
+
+function refreshHospitalSource() {
+  map.getSource("hospitals").setData(hospitalsToGeoJSON());
+}
+
+function simulateWaitTimes() {
+  hospitals.forEach((hospital) => {
+    hospital.wait_time_minutes = Math.max(15, Math.min(285, hospital.wait_time_minutes + Math.floor(Math.random() * 19) - 9));
   });
-
-  const bicicletas = new THREE.Mesh(geometriaBicicletas, materialBicicletas);
-  bicicletas.position.y = alturaBicicletas / 2;
-  bicicletas.castShadow = true;
-  bicicletas.userData.estacion = estacion;
-  grupo.add(bicicletas);
-
-  grupoEstaciones.add(grupo);
-  objetosEstacion.push(capacidad, bicicletas);
+  refreshHospitalSource();
+  updateTimestamp();
 }
 
-function limpiarRepresentacion() {
-  objetosEstacion = [];
-
-  while (grupoEstaciones.children.length > 0) {
-    const grupo = grupoEstaciones.children[0];
-
-    grupo.traverse((objeto) => {
-      if (objeto.geometry) objeto.geometry.dispose();
-      if (objeto.material) objeto.material.dispose();
-    });
-
-    grupoEstaciones.remove(grupo);
-  }
+function animateCriticalPulse() {
+  pulsePhase = (pulsePhase + 0.045) % 1;
+  refreshHospitalSource();
 }
 
-function actualizarBaseGeografica(estacionesDistribuidas) {
-  limpiarBaseGeografica();
-  grupoBaseGeografica.visible = parametros.modo === "geografico";
-
-  if (!grupoBaseGeografica.visible || estacionesDistribuidas.length === 0) return;
-
-  const xs = estacionesDistribuidas.map((estacion) => estacion.x);
-  const zs = estacionesDistribuidas.map((estacion) => estacion.z);
-  const minX = Math.min(...xs);
-  const maxX = Math.max(...xs);
-  const minZ = Math.min(...zs);
-  const maxZ = Math.max(...zs);
-  const ancho = maxX - minX;
-  const profundidad = maxZ - minZ;
-  const largoFlecha = Math.max(4, Math.min(ancho, profundidad) * 0.28);
-  const xGuia = minX - 3.2;
-  const zInicio = maxZ;
-  const zFinal = zInicio - largoFlecha;
-
-  const materialGuia = new THREE.LineBasicMaterial({
-    color: 0xd9d2c3,
-    transparent: true,
-    opacity: 0.5,
-  });
-
-  const flecha = new THREE.Line(
-    new THREE.BufferGeometry().setFromPoints([
-      new THREE.Vector3(xGuia, 0.04, zInicio),
-      new THREE.Vector3(xGuia, 0.04, zFinal),
-    ]),
-    materialGuia
-  );
-
-  const cabeza = new THREE.Mesh(
-    new THREE.ConeGeometry(0.42, 1.1, 3),
-    new THREE.MeshBasicMaterial({
-      color: 0xd9d2c3,
-      transparent: true,
-      opacity: 0.55,
-    })
-  );
-  cabeza.rotation.x = Math.PI / 2;
-  cabeza.rotation.z = Math.PI;
-  cabeza.position.set(xGuia, 0.06, zFinal - 0.46);
-
-  grupoBaseGeografica.add(flecha, cabeza);
-  grupoBaseGeografica.add(crearEtiquetaSuelo("N", xGuia, zFinal - 1.45, 42));
-  grupoBaseGeografica.add(
-    crearEtiquetaSuelo("lon → / lat ↑", minX, maxZ + 1.9, 34)
-  );
+function updateTimestamp() {
+  document.querySelector("#last-update").textContent = new Date().toLocaleTimeString("es-CL", { hour: "2-digit", minute: "2-digit", second: "2-digit" });
 }
 
-function limpiarBaseGeografica() {
-  limpiarGrupo(grupoBaseGeografica);
-}
-
-function limpiarGrupo(grupo) {
-  while (grupo.children.length > 0) {
-    const objeto = grupo.children[0];
-
-    if (objeto.geometry) objeto.geometry.dispose();
-    if (objeto.material) {
-      if (objeto.material.map) objeto.material.map.dispose();
-      objeto.material.dispose();
-    }
-
-    grupo.remove(objeto);
-  }
-}
-
-function crearEtiquetaSuelo(texto, x, z, tamanoFuente) {
-  const canvas = document.createElement("canvas");
-  const contexto = canvas.getContext("2d");
-  canvas.width = 256;
-  canvas.height = 96;
-
-  contexto.fillStyle = "rgba(217, 210, 195, 0.72)";
-  contexto.font = `${tamanoFuente}px Roboto, Arial, sans-serif`;
-  contexto.textAlign = "center";
-  contexto.textBaseline = "middle";
-  contexto.fillText(texto, canvas.width / 2, canvas.height / 2);
-
-  const textura = new THREE.CanvasTexture(canvas);
-  const etiqueta = new THREE.Sprite(
-    new THREE.SpriteMaterial({
-      map: textura,
-      transparent: true,
-      depthWrite: false,
-    })
-  );
-  etiqueta.position.set(x, 0.18, z);
-  etiqueta.scale.set(5.4, 2.0, 1);
-
-  return etiqueta;
-}
-
-// ======================================================
-// 05 — INTERFAZ + INSPECTOR
-// ======================================================
-
-const raycaster = new THREE.Raycaster();
-const puntero = new THREE.Vector2();
-
-renderer.domElement.addEventListener("pointerdown", (event) => {
-  const rect = renderer.domElement.getBoundingClientRect();
-
-  puntero.x = ((event.clientX - rect.left) / rect.width) * 2 - 1;
-  puntero.y = -((event.clientY - rect.top) / rect.height) * 2 + 1;
-
-  raycaster.setFromCamera(puntero, camara);
-
-  const intersecciones = raycaster.intersectObjects(objetosEstacion, false);
-
-  if (intersecciones.length > 0) {
-    mostrarEstacion(intersecciones[0].object.userData.estacion);
-  }
-});
-
-function mostrarEstacion(estacion) {
-  const ocupacion = calcularOcupacion(estacion);
-
-  document.querySelector("#estacion-nombre").textContent = estacion.nombre;
-  document.querySelector("#m-bicis").textContent = estacion.bicicletas;
-  document.querySelector("#m-libres").textContent = estacion.anclajes_libres;
-  document.querySelector("#m-capacidad").textContent = estacion.capacidad;
-  document.querySelector("#m-ocupacion").textContent =
-    `${Math.round(ocupacion * 100)}%`;
-}
-
-document.querySelector("#modo-distribucion").addEventListener("change", (event) => {
-  parametros.modo = event.target.value;
-  generarRepresentacion();
-});
-
-conectarSlider("escala-altura", "escala-altura-valor", "escalaAltura", 2);
-conectarSlider("escala-ancho", "escala-ancho-valor", "escalaAncho", 2);
-conectarSlider("cantidad", "cantidad-valor", "cantidad", 0);
-
-function conectarSlider(idControl, idValor, parametro, decimales) {
-  const control = document.querySelector(`#${idControl}`);
-  const valor = document.querySelector(`#${idValor}`);
-
-  control.addEventListener("input", (event) => {
-    parametros[parametro] = Number(event.target.value);
-    valor.value = parametros[parametro].toFixed(decimales);
-    generarRepresentacion();
-  });
-}
-
-document.querySelector("#actualizar").addEventListener("click", async () => {
-  segundosRestantes = INTERVALO_ACTUALIZACION;
-  await cargarDatosVivos();
-});
-
-document.querySelector("#pausar").addEventListener("click", (event) => {
-  actualizacionAutomatica = !actualizacionAutomatica;
-  event.target.textContent = actualizacionAutomatica
-    ? "Pausar auto"
-    : "Reanudar auto";
-
-  document.querySelector("#cuenta-regresiva").textContent =
-    actualizacionAutomatica ? `${segundosRestantes} s` : "pausada";
-});
-
-function actualizarEstadoConexion(tipo) {
-  const estado = document.querySelector("#estado-label");
-
-  if (tipo === "vivo") {
-    estado.innerHTML = '<i class="status-dot"></i> conectado';
-  } else if (tipo === "respaldo") {
-    estado.textContent = "respaldo local";
-  } else {
-    estado.textContent = "conectando…";
-  }
-}
-
-function formatearHora(timestamp) {
-  if (!timestamp) return new Date().toLocaleTimeString("es-CL");
-
-  // GBFS v2 usa epoch seconds.
-  const fecha = new Date(timestamp * 1000);
-
-  return fecha.toLocaleTimeString("es-CL", {
-    hour: "2-digit",
-    minute: "2-digit",
-    second: "2-digit",
-  });
-}
-
-// ======================================================
-// 06 — POLLING RESPONSABLE
-// ======================================================
-// La app consulta periódicamente el feed para mantener visible la fuente viva.
-// El feed puede declarar un TTL mayor, por lo que algunas respuestas pueden repetirse.
-// El contador mantiene visible que el sistema está esperando la próxima actualización.
-
-setInterval(async () => {
-  if (!actualizacionAutomatica) return;
-
-  segundosRestantes -= 1;
-  document.querySelector("#cuenta-regresiva").textContent =
-    `${segundosRestantes} s`;
-
-  if (segundosRestantes <= 0) {
-    segundosRestantes = INTERVALO_ACTUALIZACION;
-    await cargarDatosVivos();
-  }
-}, 1000);
-
-// ======================================================
-// 07 — ANIMACIÓN + RESPONSIVE
-// ======================================================
-
-function animar() {
-  requestAnimationFrame(animar);
-  controlesOrbita.update();
-  renderer.render(escena, camara);
-}
-
-function ajustarVentana() {
-  const ancho = viewport.clientWidth;
-  const altura = viewport.clientHeight;
-
-  camara.aspect = ancho / altura;
-  camara.updateProjectionMatrix();
-  renderer.setSize(ancho, altura);
-}
-
-window.addEventListener("resize", ajustarVentana);
-
-cargarDatosVivos();
-animar();
+document.querySelector("#city-filter").addEventListener("change", (event) => applyCityView(event.target.value));
+init();
