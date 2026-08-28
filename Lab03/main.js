@@ -13,8 +13,22 @@ const SATELLITE_STYLE = {
       tileSize: 256,
       attribution: "Tiles © Esri — Source: Esri, Maxar, Earthstar Geographics, and the GIS User Community",
     },
+    esriTransportation: {
+      type: "raster",
+      tiles: ["https://services.arcgisonline.com/ArcGIS/rest/services/Reference/World_Transportation/MapServer/tile/{z}/{y}/{x}"],
+      tileSize: 256,
+    },
+    esriLabels: {
+      type: "raster",
+      tiles: ["https://services.arcgisonline.com/ArcGIS/rest/services/Reference/World_Boundaries_and_Places/MapServer/tile/{z}/{y}/{x}"],
+      tileSize: 256,
+    },
   },
-  layers: [{ id: "esri-satellite", type: "raster", source: "esriWorldImagery" }],
+  layers: [
+    { id: "esri-satellite", type: "raster", source: "esriWorldImagery" },
+    { id: "esri-transportation", type: "raster", source: "esriTransportation", minzoom: 12 },
+    { id: "esri-labels", type: "raster", source: "esriLabels", minzoom: 10 },
+  ],
 };
 
 let map;
@@ -135,6 +149,7 @@ function openPopup(event) {
   const hospital = hospitals.find((item) => item.id === feature.properties.id);
   showInspector(hospital);
   highlightHospital(hospital.id);
+  flyToHospital(hospital);
 }
 
 function applyCityView(city) {
@@ -206,7 +221,20 @@ function showInspector(hospital) {
   document.querySelector("#inspector-capacity").textContent = hospital.capacity;
   document.querySelector("#capacity-fill").className = status.key;
   document.querySelector("#capacity-fill").style.width = `${ratio}%`;
+  document.querySelector("#inspector-coordinates").textContent = `${hospital.lat.toFixed(6)}, ${hospital.lon.toFixed(6)}`;
+  document.querySelector("#google-maps-link").href = `https://www.google.com/maps/dir/?api=1&destination=${hospital.lat},${hospital.lon}`;
   document.querySelector("#inspector").hidden = false;
+}
+
+function flyToHospital(hospital) {
+  map.flyTo({
+    center: [hospital.lon, hospital.lat],
+    zoom: 16,
+    pitch: 55,
+    bearing: 20,
+    duration: 1750,
+    essential: true,
+  });
 }
 
 function recommendOptimalCenter() {
@@ -214,7 +242,7 @@ function recommendOptimalCenter() {
   if (!best) return;
   highlightHospital(best.id);
   showInspector(best);
-  map.flyTo({ center: [best.lon, best.lat], zoom: 14, pitch: 58, bearing: 24, duration: 1900, essential: true });
+  flyToHospital(best);
 }
 
 document.querySelector("#city-filter").addEventListener("change", (event) => applyCityView(event.target.value));
