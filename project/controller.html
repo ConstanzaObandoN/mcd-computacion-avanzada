@@ -1,0 +1,132 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+  <title>DOM Controller - Celular</title>
+  <style>
+    body { margin: 0; background: #0f172a; color: white; font-family: system-ui, sans-serif; text-align: center; }
+    #videoContainer { position: relative; width: 100vw; height: 60vh; background: #000; overflow: hidden; }
+    video, canvas { position: absolute; top: 0; left: 0; width: 100%; height: 100%; object-fit: cover; transform: scaleX(-1); }
+    .panel { padding: 15px; }
+    .badge { display: inline-block; padding: 6px 12px; border-radius: 20px; font-weight: 600; font-size: 13px; margin-bottom: 8px; }
+    .status-ok { background: #065f46; color: #34d399; }
+    .metric { font-size: 18px; margin: 6px 0; }
+  </style>
+  <script src="https://unpkg.com/mqtt/dist/mqtt.min.js"></script>
+</head>
+<body>
+
+  <div id="videoContainer">
+    <video id="webcam" autoplay playsinline muted></video>
+    <canvas id="canvasCapture"></canvas>
+  </div>
+
+  <div class="panel">
+    <div id="statusBadge" class="badge status-ok">Conectando a EMQX...</div>
+    <div class="metric">Fuerza Deformación: <strong id="valForce" style="color:#38bdf8;">0%</strong></div>
+    <div style="font-size:12px; color:#94a3b8;">Junta el pulgar y el índice frente a la cámara para pellizcar la malla.</div>
+  </div>
+
+  <script>
+    const USER_ID = "user_" + Math.random().toString(16).substring(2, 6);
+    const TOPIC = "mcd/dom/shared_mesh";
+    const ROBOFLOW_KEY = "eCStPvsE0RLs6kQ7cWzW";
+    const ROBOFLOW_MODEL = "hand-pose-estimation-hfn9o/1";
+
+    const video = document.getElementById("webcam");
+    const canvas = document.getElementById("canvasCapture");
+    const ctx = canvas.getContext("2d");
+    const valForce = document.getElementById("valForce");
+    const statusBadge = document.getElementById("statusBadge");
+
+    // Conexión MQTT
+    const client = mqtt.connect("wss://broker.emqx.io:8084/mqtt", {
+      clientId: USER_ID,
+      clean: true
+    });
+
+    client.on("connect", () => {
+      statusBadge.innerText = `Conectado a EMQX (${USER_ID})`;
+    });
+
+    // Iniciar cámara del celular
+    navigator.mediaDevices.getUserMedia({
+      video: { facingMode: "user", width: { ideal: 640 }, height: { ideal: 480 } },
+      audio: false
+    }).then(stream => {
+      video.srcObject = stream;
+      video.onloadedmetadata = () => {
+        canvas.width = video.videoWidth;
+        canvas.height = video.videoHeight;
+        iniciarInferencia();
+      };
+    }).catch(err => {
+      alert("Error accediendo a la cámara: " + err);
+    });
+
+    let isProcessing = false;
+
+    async function inferirRoboflow(base64Image) {
+      try {
+        const res = await fetch(`https://serverless.roboflow.com/${ROBOFLOW_MODEL}?api_key=${ROBOFLOW_KEY}`, {
+          method: "POST",
+          headers: { "Content-Type": "application/x-www-form-urlencoded" },
+          body: base64Image
+        });
+        return await res.json();
+      } catch (e) {
+        return null;
+      }
+    }
+
+    async function procesarFrame() {
+      if (isProcessing) return;
+      isProcessing = true;
+
+      ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
+      const dataUrl = canvas.toDataURL("image/jpeg", 0.6);
+      const base64Data = dataUrl.split(",")[1];
+
+      const resultado = await inferirRoboflow(base64Data);
+
+      if (resultado && resultado.predictions && resultado.predictions.length > 0) {
+        const pred = resultado.predictions[0];
+        
+        // Coordenadas normalizadas de la mano
+        const xNorm = pred.x / canvas.width;
+        const yNorm = pred.y / canvas.height;
+
+        let deformForce = 0.5; // Valor base
+
+        // Si el modelo retorna keypoints para pulgar e índice, calculamos proximidad
+        if (pred.keypoints && pred.keypoints.length >= 2) {
+          const pt1 = pred.keypoints[0];
+          const pt2 = pred.keypoints[1];
+          const dist = Math.hypot(pt1.x - pt2.x, pt1.y - pt2.y);
+          // A menor distancia, mayor fuerza de pellizco
+          deformForce = Math.max(0, Math.min(1, 1 - (dist / 120)));
+        }
+
+        valForce.innerText = Math.round(deformForce * 100) + "%";
+
+        // Publicar a EMQX
+        client.publish(TOPIC, JSON.stringify({
+          id: USER_ID,
+          x: xNorm,
+          y: yNorm,
+          force: deformForce,
+          ts: Date.now()
+        }));
+      }
+
+      isProcessing = false;
+    }
+
+    function iniciarInferencia() {
+      // Evaluar cada 200 ms (~5 FPS para no saturar requests serverless)
+      setInterval(procesarFrame, 200);
+    }
+  </script>
+</body>
+</html>
