@@ -4,11 +4,12 @@
   <meta charset="UTF-8">
   <title>DOM Colaborativo - Pantalla Central</title>
   <style>
-    body { margin: 0; overflow: hidden; background: #0f172a; color: white; font-family: system-ui, sans-serif; }
-    #overlay { position: absolute; top: 20px; left: 20px; z-index: 10; background: rgba(15,23,42,0.85); padding: 16px 20px; border-radius: 10px; border: 1px solid #334155; }
-    h2 { margin: 0 0 6px 0; font-size: 20px; }
-    .stat { font-size: 14px; color: #94a3b8; }
+    body { margin: 0; overflow: hidden; background: #0b0f19; color: white; font-family: system-ui, sans-serif; }
+    #overlay { position: absolute; top: 20px; left: 20px; z-index: 10; background: rgba(15,23,42,0.9); padding: 16px 22px; border-radius: 12px; border: 1px solid #334155; box-shadow: 0 4px 20px rgba(0,0,0,0.5); }
+    h2 { margin: 0 0 6px 0; font-size: 18px; }
+    .stat { font-size: 14px; color: #94a3b8; margin-top: 4px; }
     .stat strong { color: #38bdf8; }
+    #debugLog { font-size: 11px; color: #64748b; margin-top: 8px; font-family: monospace; }
   </style>
   <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
   <script src="https://unpkg.com/mqtt/dist/mqtt.min.js"></script>
@@ -17,79 +18,101 @@
 
   <div id="overlay">
     <h2>🌐 Simulación DOM Colaborativa</h2>
-    <div class="stat">Dispositivos activos deformando: <strong id="userCount">0</strong></div>
-    <div class="stat">Broker: <strong>EMQX (WebSockets)</strong></div>
+    <div class="stat">Dispositivos conectados: <strong id="userCount">0</strong></div>
+    <div class="stat">Broker: <strong>EMQX Public WebSocket</strong></div>
+    <div id="debugLog">Esperando mensajes MQTT...</div>
   </div>
 
   <script>
-    // 1. Escena Three.js
+    // 1. Escena Three.js y Cámara
     const scene = new THREE.Scene();
     const camera = new THREE.PerspectiveCamera(50, window.innerWidth / window.innerHeight, 0.1, 1000);
-    camera.position.set(0, 0, 4.5);
+    camera.position.set(0, -0.5, 4.2);
 
     const renderer = new THREE.WebGLRenderer({ antialias: true });
     renderer.setSize(window.innerWidth, window.innerHeight);
     renderer.setPixelRatio(window.devicePixelRatio);
     document.body.appendChild(renderer.domElement);
 
-    // Iluminación
-    const dirLight = new THREE.DirectionalLight(0xffffff, 1.4);
-    dirLight.position.set(5, 5, 5);
-    scene.add(dirLight);
-    scene.add(new THREE.AmbientLight(0x38bdf8, 0.4));
+    // Iluminación mejorada para visualización clara
+    const ambientLight = new THREE.AmbientLight(0xffffff, 0.8);
+    scene.add(ambientLight);
 
-    // Malla deformable (Plano denso viscoelástico)
-    const geometry = new THREE.PlaneGeometry(3.5, 3.5, 80, 80);
+    const pointLight = new THREE.PointLight(0x38bdf8, 2, 50);
+    pointLight.position.set(0, 2, 4);
+    scene.add(pointLight);
+
+    // 2. Malla Viscoelástica (DOM)
+    const geometry = new THREE.PlaneGeometry(3.6, 3.6, 70, 70);
     const originalPos = geometry.attributes.position.clone();
     
+    // Material con wireframe brillante y color reactivo
     const material = new THREE.MeshStandardMaterial({
-      color: 0x3b82f6,
+      color: 0x0284c7,
       wireframe: true,
-      roughness: 0.2,
-      metalness: 0.8
+      roughness: 0.1,
+      metalness: 0.5,
+      emissive: 0x0369a1,
+      emissiveIntensity: 0.4
     });
 
     const mesh = new THREE.Mesh(geometry, material);
     scene.add(mesh);
 
-    // 2. Registro de fuerzas entrantes
+    // 3. Registro de usuarios y deformaciones
     const activeTouches = new Map();
+    const userCountEl = document.getElementById("userCount");
+    const debugLogEl = document.getElementById("debugLog");
 
-    // 3. Conexión MQTT
+    // 4. Conexión MQTT a EMQX
     const client = mqtt.connect("wss://broker.emqx.io:8084/mqtt", {
-      clientId: "host_screen_" + Math.random().toString(16).substring(2, 6)
+      clientId: "screen_" + Math.random().toString(16).substring(2, 8),
+      clean: true
     });
 
+    const TOPIC = "mcd/dom/shared_mesh";
+
     client.on("connect", () => {
-      client.subscribe("mcd/dom/shared_mesh");
+      debugLogEl.innerText = "Suscrito a: " + TOPIC;
+      client.subscribe(TOPIC, (err) => {
+        if (err) debugLogEl.innerText = "Error al suscribir: " + err;
+      });
     });
 
     client.on("message", (topic, message) => {
-      const data = JSON.parse(message.toString());
-      // Mapear coordenadas (0 a 1) al espacio 3D de la malla (-1.75 a +1.75)
-      activeTouches.set(data.id, {
-        x: (data.x - 0.5) * 3.5,
-        y: -(data.y - 0.5) * 3.5,
-        force: data.force,
-        lastSeen: Date.now()
-      });
-      document.getElementById("userCount").innerText = activeTouches.size;
+      try {
+        const data = JSON.parse(message.toString());
+        
+        // Mapeo de coordenadas (0..1) al plano 3D
+        activeTouches.set(data.id, {
+          x: (data.x - 0.5) * 3.6,
+          y: -(data.y - 0.5) * 3.6,
+          force: data.force || 0.5,
+          lastSeen: Date.now()
+        });
+
+        debugLogEl.innerText = `Último dato: ${data.id} (Fuerza: ${Math.round((data.force || 0) * 100)}%)`;
+      } catch (e) {
+        console.error("Error parseando MQTT:", e);
+      }
     });
 
-    // 4. Bucle de Render y Física Elástica
+    // 5. Motor de Deformación y Retorno Elástico
     function animate() {
       requestAnimationFrame(animate);
 
       const pos = geometry.attributes.position;
       const now = Date.now();
 
-      // Limpiar usuarios inactivos
+      // Tolerancia de inactividad aumentada a 4 segundos
       for (const [id, u] of activeTouches.entries()) {
-        if (now - u.lastSeen > 1200) activeTouches.delete(id);
+        if (now - u.lastSeen > 4000) {
+          activeTouches.delete(id);
+        }
       }
-      document.getElementById("userCount").innerText = activeTouches.size;
+      userCountEl.innerText = activeTouches.size;
 
-      // Calcular deformación por nodo
+      // Cálculo de desplazamiento viscoelástico por vértice
       for (let i = 0; i < pos.count; i++) {
         const ox = originalPos.getX(i);
         const oy = originalPos.getY(i);
@@ -99,18 +122,21 @@
 
         activeTouches.forEach(u => {
           const dist = Math.hypot(ox - u.x, oy - u.y);
-          const sigma = 0.45; // Radio de afectación
-          const displacement = (u.force * 0.8) * Math.exp(-(dist * dist) / (2 * sigma * sigma));
+          const sigma = 0.55; // Radio de afectación de la deformación
+          const displacement = (u.force * 1.2) * Math.exp(-(dist * dist) / (2 * sigma * sigma));
           targetZ -= displacement;
         });
 
-        // Retorno elástico amortiguado (damping)
+        // Retorno elástico continuo
         const currentZ = pos.getZ(i);
-        pos.setZ(i, currentZ + (targetZ - currentZ) * 0.15);
+        pos.setZ(i, currentZ + (targetZ - currentZ) * 0.12);
       }
 
       pos.needsUpdate = true;
       geometry.computeVertexNormals();
+
+      // Suave oscilación de perspectiva
+      mesh.rotation.z = Math.sin(now * 0.0005) * 0.05;
 
       renderer.render(scene, camera);
     }
