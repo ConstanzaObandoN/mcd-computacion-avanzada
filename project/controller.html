@@ -3,90 +3,56 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
-  <title>DOM Controller</title>
+  <title>Escultor Play-Doh</title>
   <style>
     body { margin: 0; background: #0f172a; color: white; font-family: system-ui, sans-serif; text-align: center; }
-    .status-bar { padding: 10px; font-weight: bold; background: #334155; }
-    .status-ok { background: #059669; }
-    .status-err { background: #dc2626; }
+    .status-bar { padding: 8px; font-weight: bold; background: #059669; font-size: 13px; }
     
-    #touchArea { width: 90vw; height: 45vh; margin: 15px auto; background: #1e293b; border: 2px dashed #475569; border-radius: 12px; display: flex; align-items: center; justify-content: center; position: relative; touch-action: none; }
-    #touchPoint { width: 30px; height: 30px; background: #38bdf8; border-radius: 50%; position: absolute; display: none; transform: translate(-50%, -50%); }
-    
-    .panel { padding: 10px 20px; font-size: 14px; text-align: left; background: #1e293b; margin: 10px; border-radius: 8px; }
-    .btn { background: #2563eb; color: white; border: none; padding: 10px 16px; border-radius: 6px; font-weight: bold; margin: 5px; }
+    .mode-selector { display: flex; justify-content: center; gap: 10px; margin: 12px 0 6px 0; }
+    .mode-btn { flex: 1; max-width: 140px; padding: 10px; border-radius: 8px; border: 2px solid #475569; background: #1e293b; color: white; font-weight: bold; cursor: pointer; }
+    .mode-btn.active { border-color: #f97316; background: #f97316; }
+
+    #touchArea { width: 90vw; height: 50vh; margin: 10px auto; background: #1e293b; border: 2px dashed #475569; border-radius: 14px; display: flex; align-items: center; justify-content: center; position: relative; touch-action: none; }
+    #touchPoint { width: 40px; height: 40px; background: rgba(249, 115, 22, 0.7); border: 2px solid #fff; border-radius: 50%; position: absolute; display: none; transform: translate(-50%, -50%); pointer-events: none; }
   </style>
   <script src="https://unpkg.com/mqtt/dist/mqtt.min.js"></script>
 </head>
 <body>
 
-  <div id="statusBar" class="status-bar">Conectando a EMQX...</div>
+  <div class="status-bar" id="statusBar">🟢 Conectado al Escultor Play-Doh</div>
 
-  <!-- Área de prueba táctil inmediata -->
+  <div class="mode-selector">
+    <button class="mode-btn active" id="btnPush" onclick="setMode('push')">👇 Hundir</button>
+    <button class="mode-btn" id="btnPull" onclick="setMode('pull')">☝️ Jalar Masa</button>
+  </div>
+
   <div id="touchArea">
     <div id="touchPoint"></div>
-    <span id="touchGuide" style="color:#94a3b8;">Toca o arrastra aquí para deformar</span>
+    <span id="guide" style="color:#94a3b8; font-size:14px;">Mueve el dedo aquí para esculpir la bola</span>
   </div>
 
-  <div class="panel">
-    <div><strong>ID Usuario:</strong> <span id="lblId">...</span></div>
-    <div><strong>Coordenadas:</strong> <span id="lblCoords">X: 0 | Y: 0</span></div>
-    <div><strong>Fuerza:</strong> <span id="lblForce">0%</span></div>
-    <div><strong>Mensajes enviados:</strong> <span id="lblCount">0</span></div>
-  </div>
-
-  <video id="webcam" autoplay playsinline muted style="display:none;"></video>
-  <canvas id="canvasCapture" style="display:none;"></canvas>
+  <div style="font-size:12px; color:#64748b;">Conectado a la esfera central en vivo</div>
 
   <script>
-    const USER_ID = "cel_" + Math.random().toString(16).substring(2, 6);
-    document.getElementById("lblId").innerText = USER_ID;
-    
-    const TOPIC = "mcd/dom/shared_mesh";
-    const statusBar = document.getElementById("statusBar");
-    let msgCount = 0;
+    const USER_ID = "clay_" + Math.random().toString(16).substring(2, 6);
+    let currentMode = "push";
 
-    // Conexión MQTT
     const client = mqtt.connect("wss://broker.emqx.io:8084/mqtt", {
       clientId: USER_ID,
-      clean: true,
-      keepalive: 60
+      clean: true
     });
 
-    client.on("connect", () => {
-      statusBar.className = "status-bar status-ok";
-      statusBar.innerText = "🟢 Conectado a EMQX";
-    });
-
-    client.on("error", (err) => {
-      statusBar.className = "status-bar status-err";
-      statusBar.innerText = "🔴 Error MQTT: " + err;
-    });
-
-    function emitirDeformacion(xNorm, yNorm, fuerza) {
-      if (!client.connected) return;
-
-      const payload = JSON.stringify({
-        id: USER_ID,
-        x: Number(xNorm.toFixed(2)),
-        y: Number(yNorm.toFixed(2)),
-        force: Number(fuerza.toFixed(2)),
-        ts: Date.now()
-      });
-
-      client.publish(TOPIC, payload);
-      msgCount++;
-      document.getElementById("lblCount").innerText = msgCount;
-      document.getElementById("lblCoords").innerText = `X: ${xNorm.toFixed(2)} | Y: ${yNorm.toFixed(2)}`;
-      document.getElementById("lblForce").innerText = `${Math.round(fuerza * 100)}%`;
+    function setMode(mode) {
+      currentMode = mode;
+      document.getElementById("btnPush").className = "mode-btn " + (mode === "push" ? "active" : "");
+      document.getElementById("btnPull").className = "mode-btn " + (mode === "pull" ? "active" : "");
     }
 
-    // Input Táctil Directo (Garantiza respuesta fluida a 30 FPS)
     const touchArea = document.getElementById("touchArea");
     const touchPoint = document.getElementById("touchPoint");
-    const touchGuide = document.getElementById("touchGuide");
+    const guide = document.getElementById("guide");
 
-    function procesarTouch(e) {
+    function esculpir(e) {
       e.preventDefault();
       const rect = touchArea.getBoundingClientRect();
       const touch = e.touches ? e.touches[0] : e;
@@ -98,19 +64,24 @@
         touchPoint.style.display = "block";
         touchPoint.style.left = x + "px";
         touchPoint.style.top = y + "px";
-        touchGuide.style.display = "none";
+        guide.style.display = "none";
 
-        const xNorm = x / rect.width;
-        const yNorm = y / rect.height;
-        emitirDeformacion(xNorm, yNorm, 0.9);
+        if (client.connected) {
+          client.publish("mcd/dom/shared_mesh", JSON.stringify({
+            id: USER_ID,
+            x: Number((x / rect.width).toFixed(2)),
+            y: Number((y / rect.height).toFixed(2)),
+            force: 1.0,
+            mode: currentMode
+          }));
+        }
       }
     }
 
-    touchArea.addEventListener("touchstart", procesarTouch, { passive: false });
-    touchArea.addEventListener("touchmove", procesarTouch, { passive: false });
+    touchArea.addEventListener("touchstart", esculpir, { passive: false });
+    touchArea.addEventListener("touchmove", esculpir, { passive: false });
     touchArea.addEventListener("touchend", () => {
       touchPoint.style.display = "none";
-      touchGuide.style.display = "block";
     });
   </script>
 </body>
