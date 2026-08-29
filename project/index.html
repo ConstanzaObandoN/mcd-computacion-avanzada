@@ -2,14 +2,40 @@
 <html lang="es">
 <head>
   <meta charset="UTF-8">
-  <title>DOM Play-Doh Colaborativo</title>
+  <title>DOM Play-Doh Colaborativo - Pantalla Central</title>
   <style>
-    body { margin: 0; overflow: hidden; background: #0f172a; color: white; font-family: system-ui, sans-serif; }
-    #panel { position: absolute; top: 15px; left: 15px; z-index: 10; background: rgba(15,23,42,0.92); padding: 14px 18px; border-radius: 12px; border: 1px solid #334155; width: 280px; box-shadow: 0 4px 20px rgba(0,0,0,0.5); }
-    .btn-reset { background: #ef4444; color: white; border: none; padding: 8px 12px; border-radius: 6px; font-weight: bold; cursor: pointer; margin-top: 10px; width: 100%; }
-    .btn-reset:hover { background: #dc2626; }
+    body { margin: 0; overflow: hidden; background: #0b0f19; color: white; font-family: system-ui, -apple-system, sans-serif; }
+    
+    #panel {
+      position: absolute;
+      top: 15px;
+      left: 15px;
+      z-index: 10;
+      background: rgba(15, 23, 42, 0.92);
+      backdrop-filter: blur(8px);
+      padding: 16px 20px;
+      border-radius: 12px;
+      border: 1px solid #334155;
+      width: 290px;
+      box-shadow: 0 4px 20px rgba(0,0,0,0.5);
+    }
+    h3 { margin: 0 0 8px 0; font-size: 16px; color: #f97316; }
     .stat { font-size: 13px; color: #94a3b8; margin-top: 4px; }
     .stat strong { color: #38bdf8; }
+    
+    .btn-reset {
+      background: #ef4444;
+      color: white;
+      border: none;
+      padding: 8px 12px;
+      border-radius: 6px;
+      font-weight: bold;
+      cursor: pointer;
+      margin-top: 12px;
+      width: 100%;
+      transition: background 0.2s;
+    }
+    .btn-reset:hover { background: #dc2626; }
   </style>
   <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/controls/OrbitControls.js"></script>
@@ -18,90 +44,73 @@
 <body>
 
   <div id="panel">
-    <h3 style="margin:0 0 6px 0; font-size:16px;">🎨 Escultura Play-Doh Colectiva</h3>
+    <h3>🎨 Escultura Play-Doh Colectiva</h3>
     <div class="stat">Escultores conectados: <strong id="userCount">0</strong></div>
-    <div class="stat">Último toque: <strong id="lastAction">Esperando...</strong></div>
+    <div class="stat">Última acción: <strong id="lastAction">Esperando conexiones...</strong></div>
+    <div class="stat" style="font-size:11px; color:#64748b; margin-top:8px;">Arrastra con el mouse para rotar la escultura.</div>
     <button class="btn-reset" onclick="resetSphere()">🔄 Nueva Bola de Masa</button>
   </div>
 
   <script>
-    // 1. Escena y Cámara
+    // 1. Escena Three.js y Controles de Cámara Orbit
     const scene = new THREE.Scene();
     const camera = new THREE.PerspectiveCamera(45, window.innerWidth / window.innerHeight, 0.1, 1000);
     camera.position.set(0, 0, 5.2);
 
-    const renderer = new THREE.WebGLRenderer({ antialias: true });
+    const renderer = new THREE.WebGLRenderer({ antialias: true, powerPreference: "high-performance" });
     renderer.setSize(window.innerWidth, window.innerHeight);
-    renderer.setPixelRatio(window.devicePixelRatio);
-    renderer.shadowMap.enabled = true;
+    renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
     document.body.appendChild(renderer.domElement);
 
     const controls = new THREE.OrbitControls(camera, renderer.domElement);
     controls.enableDamping = true;
 
-    // Iluminación para resaltar el volumen sólido y sombras
-    scene.add(new THREE.AmbientLight(0xffffff, 0.6));
-    
-    const lightFront = new THREE.DirectionalLight(0xfff7ed, 1.3);
+    // Iluminación para resaltar volumen sólido y sombras
+    scene.add(new THREE.AmbientLight(0xffffff, 0.7));
+
+    const lightFront = new THREE.DirectionalLight(0xfff7ed, 1.4);
     lightFront.position.set(4, 6, 6);
     scene.add(lightFront);
 
-    const lightBack = new THREE.DirectionalLight(0x38bdf8, 0.6);
-    lightBack.position.set(-4, -4, -3);
-    scene.add(lightBack);
+    const lightRim = new THREE.DirectionalLight(0x38bdf8, 0.6);
+    lightRim.position.set(-4, -4, -3);
+    scene.add(lightRim);
 
     // 2. Esfera Sólida Play-Doh
     const RADIUS = 1.6;
     const geometry = new THREE.SphereGeometry(RADIUS, 120, 120);
     const originalPositions = geometry.attributes.position.clone();
 
-    // Material sólido estilo plastilina/arcilla
     const material = new THREE.MeshStandardMaterial({
-      color: 0xf97316,       // Naranja Play-Doh
-      roughness: 0.8,        // Acabado mate no reflectante
+      color: 0xf97316,
+      roughness: 0.8,
       metalness: 0.05,
-      wireframe: false       // Esfera 100% sólida
+      wireframe: false
     });
 
     const sphereMesh = new THREE.Mesh(geometry, material);
     scene.add(sphereMesh);
 
     // 3. Función de Deformación Plástica Permanente
-    function deformarMasaPermanente(xNorm, yNorm, fuerza, modo) {
+    function aplicarDeformacionDirecta(hit, brushRadius, fuerza, modo) {
+      if (!hit) return;
       const pos = geometry.attributes.position;
-      
-      // Proyectar el punto de impacto al frente de la esfera
-      const hitX = (xNorm - 0.5) * (RADIUS * 2.2);
-      const hitY = -(yNorm - 0.5) * (RADIUS * 2.2);
-      
-      const r2 = RADIUS * RADIUS;
-      const xy2 = hitX * hitX + hitY * hitY;
-      const hitZ = xy2 < r2 ? Math.sqrt(r2 - xy2) : 0;
-
-      const radioInfluencia = 0.65; // Área de contacto del dedo
-      const direccion = modo === "pull" ? 1 : -1; // -1: Hundir, +1: Estirar hacia afuera
-      const factorEscultura = 0.08 * fuerza * direccion;
+      const direccion = modo === "pull" ? 1 : -1;
+      const desplazamientoBase = 0.08 * fuerza * direccion;
 
       for (let i = 0; i < pos.count; i++) {
         const vx = pos.getX(i);
         const vy = pos.getY(i);
         const vz = pos.getZ(i);
 
-        const dist = Math.hypot(vx - hitX, vy - hitY, vz - hitZ);
+        const dist = Math.hypot(vx - hit.x, vy - hit.y, vz - hit.z);
 
-        if (dist < radioInfluencia) {
-          // Deformación gaussiana acumulativa sobre el vértice
-          const intensidad = Math.exp(-(dist * dist) / (2 * 0.3 * 0.3));
-          const desplazamiento = factorEscultura * intensidad;
+        if (dist < brushRadius) {
+          const intensidad = Math.exp(-(dist * dist) / (2 * (brushRadius * 0.45) * (brushRadius * 0.45)));
+          const delta = desplazamientoBase * intensidad;
 
-          // Dirección normal desde el origen
           const norma = Math.hypot(vx, vy, vz) || 1;
-          const nx = vx / norma;
-          const ny = vy / norma;
-          const nz = vz / norma;
-
-          // Asignación permanente al vértice sin retorno
-          pos.setXYZ(i, vx + nx * desplazamiento, vy + ny * desplazamiento, vz + nz * desplazamiento);
+          pos.setXYZ(i, vx + (vx / norma) * delta, vy + (vy / norma) * delta, vz + (vz / norma) * delta);
         }
       }
 
@@ -109,18 +118,19 @@
       geometry.computeVertexNormals();
     }
 
-    // 4. Conexión MQTT en vivo
+    // 4. Conexión MQTT a EMQX
     const activeUsers = new Set();
     const userCountEl = document.getElementById("userCount");
     const lastActionEl = document.getElementById("lastAction");
+    const TOPIC = "mcd/dom/shared_mesh";
 
     const client = mqtt.connect("wss://broker.emqx.io:8084/mqtt", {
-      clientId: "host_playdoh_pc_" + Math.random().toString(16).substring(2, 6),
+      clientId: "host_screen_" + Math.random().toString(16).substring(2, 6),
       clean: true
     });
 
     client.on("connect", () => {
-      client.subscribe("mcd/dom/shared_mesh");
+      client.subscribe(TOPIC);
     });
 
     client.on("message", (topic, message) => {
@@ -128,9 +138,11 @@
         const data = JSON.parse(message.toString());
         activeUsers.add(data.id);
         userCountEl.innerText = activeUsers.size;
-        lastActionEl.innerText = `${data.mode === 'pull' ? 'Jalando' : 'Hundiendo'} en (${data.x}, ${data.y})`;
 
-        deformarMasaPermanente(data.x, data.y, data.force || 1.0, data.mode || "push");
+        if (data.hitPos) {
+          lastActionEl.innerText = `${data.mode === 'pull' ? 'Jalando' : 'Hundiendo'} (${data.id})`;
+          aplicarDeformacionDirecta(data.hitPos, data.radius || 0.55, data.force || 1.0, data.mode || "push");
+        }
       } catch (e) {
         console.error("Error procesando mensaje:", e);
       }

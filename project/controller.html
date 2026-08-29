@@ -3,74 +3,236 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
-  <title>Escultor Play-Doh</title>
+  <title>Sculpt3D Colaborativo</title>
   <style>
-    body { margin: 0; background: #0f172a; color: white; font-family: system-ui, sans-serif; text-align: center; }
-    .status-bar { padding: 8px; font-weight: bold; background: #059669; font-size: 13px; }
+    body { margin: 0; overflow: hidden; background: #0b0f19; color: white; font-family: system-ui, -apple-system, sans-serif; }
     
-    .mode-selector { display: flex; justify-content: center; gap: 10px; margin: 12px 0 6px 0; }
-    .mode-btn { flex: 1; max-width: 140px; padding: 10px; border-radius: 8px; border: 2px solid #475569; background: #1e293b; color: white; font-weight: bold; cursor: pointer; }
-    .mode-btn.active { border-color: #f97316; background: #f97316; }
+    /* Barra Superior de Estado y Modo */
+    #topBar {
+      position: absolute;
+      top: 10px;
+      left: 10px;
+      right: 10px;
+      z-index: 10;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      background: rgba(15, 23, 42, 0.85);
+      backdrop-filter: blur(8px);
+      padding: 8px 12px;
+      border-radius: 12px;
+      border: 1px solid #334155;
+    }
+    .badge { font-size: 11px; padding: 4px 8px; border-radius: 6px; font-weight: 600; }
+    .badge-online { background: #065f46; color: #34d399; }
 
-    #touchArea { width: 90vw; height: 50vh; margin: 10px auto; background: #1e293b; border: 2px dashed #475569; border-radius: 14px; display: flex; align-items: center; justify-content: center; position: relative; touch-action: none; }
-    #touchPoint { width: 40px; height: 40px; background: rgba(249, 115, 22, 0.7); border: 2px solid #fff; border-radius: 50%; position: absolute; display: none; transform: translate(-50%, -50%); pointer-events: none; }
+    /* Barra Inferior de Herramientas (Estilo Nomad / Sculpt3D) */
+    #bottomBar {
+      position: absolute;
+      bottom: 12px;
+      left: 10px;
+      right: 10px;
+      z-index: 10;
+      background: rgba(15, 23, 42, 0.9);
+      backdrop-filter: blur(10px);
+      padding: 12px;
+      border-radius: 16px;
+      border: 1px solid #334155;
+      display: flex;
+      flex-direction: column;
+      gap: 10px;
+    }
+    
+    .tool-row { display: flex; gap: 8px; }
+    .tool-btn {
+      flex: 1;
+      padding: 10px 4px;
+      border-radius: 8px;
+      border: 1px solid #475569;
+      background: #1e293b;
+      color: #94a3b8;
+      font-size: 13px;
+      font-weight: 600;
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 4px;
+    }
+    .tool-btn.active {
+      background: #f97316;
+      border-color: #f97316;
+      color: white;
+      box-shadow: 0 0 10px rgba(249, 115, 22, 0.4);
+    }
+    .tool-btn.camera-btn.active {
+      background: #2563eb;
+      border-color: #2563eb;
+      box-shadow: 0 0 10px rgba(37, 99, 235, 0.4);
+    }
+
+    .slider-row {
+      display: grid;
+      grid-template-columns: 70px 1fr;
+      align-items: center;
+      gap: 8px;
+      font-size: 11px;
+      color: #cbd5e1;
+    }
+    input[type=range] { width: 100%; accent-color: #f97316; }
   </style>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/controls/OrbitControls.js"></script>
   <script src="https://unpkg.com/mqtt/dist/mqtt.min.js"></script>
 </head>
 <body>
 
-  <div class="status-bar" id="statusBar">🟢 Conectado al Escultor Play-Doh</div>
-
-  <div class="mode-selector">
-    <button class="mode-btn active" id="btnPush" onclick="setMode('push')">👇 Hundir</button>
-    <button class="mode-btn" id="btnPull" onclick="setMode('pull')">☝️ Jalar Masa</button>
+  <!-- Barra Superior -->
+  <div id="topBar">
+    <div style="font-weight:700; font-size:14px; color:#f97316;">🎨 Sculpt3D Móvil</div>
+    <div id="statusBadge" class="badge badge-online">🟢 Conectado</div>
   </div>
 
-  <div id="touchArea">
-    <div id="touchPoint"></div>
-    <span id="guide" style="color:#94a3b8; font-size:14px;">Mueve el dedo aquí para esculpir la bola</span>
+  <!-- Barra de Herramientas -->
+  <div id="bottomBar">
+    <div class="tool-row">
+      <button class="tool-btn active" id="btnPush" onclick="setMode('push')">👇 Hundir</button>
+      <button class="tool-btn" id="btnPull" onclick="setMode('pull')">☝️ Jalar</button>
+      <button class="tool-btn camera-btn" id="btnOrbit" onclick="setMode('orbit')">🔄 Rotar</button>
+    </div>
+    
+    <div class="slider-row">
+      <span>Radio Pincel</span>
+      <input type="range" id="brushRadius" min="0.2" max="1.2" step="0.05" value="0.55">
+    </div>
   </div>
-
-  <div style="font-size:12px; color:#64748b;">Conectado a la esfera central en vivo</div>
 
   <script>
-    const USER_ID = "clay_" + Math.random().toString(16).substring(2, 6);
-    let currentMode = "push";
+    const USER_ID = "cel_" + Math.random().toString(16).substring(2, 6);
+    const TOPIC = "mcd/dom/shared_mesh";
 
+    // 1. Escena Three.js y Cámara Móvil
+    const scene = new THREE.Scene();
+    const camera = new THREE.PerspectiveCamera(45, window.innerWidth / window.innerHeight, 0.1, 1000);
+    camera.position.set(0, 0, 5.2);
+
+    const renderer = new THREE.WebGLRenderer({ antialias: true, powerPreference: "high-performance" });
+    renderer.setSize(window.innerWidth, window.innerHeight);
+    renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+    document.body.appendChild(renderer.domElement);
+
+    // Controles Orbit para rotar en modo cámara
+    const controls = new THREE.OrbitControls(camera, renderer.domElement);
+    controls.enableDamping = true;
+    controls.enabled = false; // Desactivado por defecto (se activa en modo 'orbit')
+
+    // Luces
+    scene.add(new THREE.AmbientLight(0xffffff, 0.7));
+    const frontLight = new THREE.DirectionalLight(0xfff7ed, 1.4);
+    frontLight.position.set(4, 6, 6);
+    scene.add(frontLight);
+
+    const rimLight = new THREE.DirectionalLight(0x38bdf8, 0.6);
+    rimLight.position.set(-4, -4, -3);
+    scene.add(rimLight);
+
+    // 2. Esfera de Escultura Local (Sincronizada con el PC)
+    const RADIUS = 1.6;
+    const geometry = new THREE.SphereGeometry(RADIUS, 90, 90);
+    const material = new THREE.MeshStandardMaterial({
+      color: 0xf97316,
+      roughness: 0.8,
+      metalness: 0.05,
+      wireframe: false
+    });
+
+    const sphereMesh = new THREE.Mesh(geometry, material);
+    scene.add(sphereMesh);
+
+    // 3. Conexión MQTT
     const client = mqtt.connect("wss://broker.emqx.io:8084/mqtt", {
       clientId: USER_ID,
       clean: true
     });
 
+    client.on("connect", () => {
+      client.subscribe(TOPIC);
+    });
+
+    // Recibir deformaciones aplicadas por otros usuarios o el PC
+    client.on("message", (topic, message) => {
+      try {
+        const data = JSON.parse(message.toString());
+        if (data.id !== USER_ID) {
+          aplicarDeformacionPunto(data.hitPos, data.radius || 0.55, data.force || 1.0, data.mode || "push");
+        }
+      } catch (e) {}
+    });
+
+    // 4. Lógica de Esculpido con Raycasting
+    const raycaster = new THREE.Raycaster();
+    const touchCoord = new THREE.Vector2();
+    let currentMode = "push"; // "push", "pull", "orbit"
+    let isTouching = false;
+
     function setMode(mode) {
       currentMode = mode;
-      document.getElementById("btnPush").className = "mode-btn " + (mode === "push" ? "active" : "");
-      document.getElementById("btnPull").className = "mode-btn " + (mode === "pull" ? "active" : "");
+      document.getElementById("btnPush").className = "tool-btn " + (mode === "push" ? "active" : "");
+      document.getElementById("btnPull").className = "tool-btn " + (mode === "pull" ? "active" : "");
+      document.getElementById("btnOrbit").className = "tool-btn camera-btn " + (mode === "orbit" ? "active" : "");
+      
+      controls.enabled = (mode === "orbit");
     }
 
-    const touchArea = document.getElementById("touchArea");
-    const touchPoint = document.getElementById("touchPoint");
-    const guide = document.getElementById("guide");
+    function aplicarDeformacionPunto(hitPoint, brushRadius, fuerza, modo) {
+      if (!hitPoint) return;
+      const pos = geometry.attributes.position;
+      const direccion = modo === "pull" ? 1 : -1;
+      const desplazamientoBase = 0.08 * fuerza * direccion;
 
-    function esculpir(e) {
-      e.preventDefault();
-      const rect = touchArea.getBoundingClientRect();
+      for (let i = 0; i < pos.count; i++) {
+        const vx = pos.getX(i);
+        const vy = pos.getY(i);
+        const vz = pos.getZ(i);
+
+        const dist = Math.hypot(vx - hitPoint.x, vy - hitPoint.y, vz - hitPoint.z);
+
+        if (dist < brushRadius) {
+          const intensidad = Math.exp(-(dist * dist) / (2 * (brushRadius * 0.45) * (brushRadius * 0.45)));
+          const delta = desplazamientoBase * intensidad;
+
+          const norma = Math.hypot(vx, vy, vz) || 1;
+          pos.setXYZ(i, vx + (vx / norma) * delta, vy + (vy / norma) * delta, vz + (vz / norma) * delta);
+        }
+      }
+
+      pos.needsUpdate = true;
+      geometry.computeVertexNormals();
+    }
+
+    function procesarTouchSculpt(e) {
+      if (currentMode === "orbit") return;
+
       const touch = e.touches ? e.touches[0] : e;
-      
-      const x = touch.clientX - rect.left;
-      const y = touch.clientY - rect.top;
+      touchCoord.x = (touch.clientX / window.innerWidth) * 2 - 1;
+      touchCoord.y = -(touch.clientY / window.innerHeight) * 2 + 1;
 
-      if (x >= 0 && x <= rect.width && y >= 0 && y <= rect.height) {
-        touchPoint.style.display = "block";
-        touchPoint.style.left = x + "px";
-        touchPoint.style.top = y + "px";
-        guide.style.display = "none";
+      raycaster.setFromCamera(touchCoord, camera);
+      const intersects = raycaster.intersectObject(sphereMesh);
 
+      if (intersects.length > 0) {
+        const hit = intersects[0].point;
+        const radius = parseFloat(document.getElementById("brushRadius").value);
+
+        // 1. Deformar en la pantalla del celular de inmediato
+        aplicarDeformacionPunto(hit, radius, 1.0, currentMode);
+
+        // 2. Enviar vector 3D al PC y a los demás teléfonos conectados
         if (client.connected) {
-          client.publish("mcd/dom/shared_mesh", JSON.stringify({
+          client.publish(TOPIC, JSON.stringify({
             id: USER_ID,
-            x: Number((x / rect.width).toFixed(2)),
-            y: Number((y / rect.height).toFixed(2)),
+            hitPos: { x: Number(hit.x.toFixed(3)), y: Number(hit.y.toFixed(3)), z: Number(hit.z.toFixed(3)) },
+            radius: radius,
             force: 1.0,
             mode: currentMode
           }));
@@ -78,10 +240,34 @@
       }
     }
 
-    touchArea.addEventListener("touchstart", esculpir, { passive: false });
-    touchArea.addEventListener("touchmove", esculpir, { passive: false });
-    touchArea.addEventListener("touchend", () => {
-      touchPoint.style.display = "none";
+    // Eventos táctiles
+    window.addEventListener("touchstart", (e) => {
+      // Ignorar si se toca la barra superior o el menú inferior
+      if (e.target.closest("#topBar") || e.target.closest("#bottomBar")) return;
+      isTouching = true;
+      procesarTouchSculpt(e);
+    }, { passive: false });
+
+    window.addEventListener("touchmove", (e) => {
+      if (!isTouching || currentMode === "orbit") return;
+      procesarTouchSculpt(e);
+    }, { passive: false });
+
+    window.addEventListener("touchend", () => { isTouching = false; });
+
+    // 5. Bucle de Render
+    function animate() {
+      requestAnimationFrame(animate);
+      if (controls.enabled) controls.update();
+      renderer.render(scene, camera);
+    }
+
+    animate();
+
+    window.addEventListener("resize", () => {
+      camera.aspect = window.innerWidth / window.innerHeight;
+      camera.updateProjectionMatrix();
+      renderer.setSize(window.innerWidth, window.innerHeight);
     });
   </script>
 </body>
