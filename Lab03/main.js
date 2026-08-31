@@ -1,4 +1,9 @@
-const CITY_VIEW = { center: [-114.0719, 51.0447], zoom: 10.8, pitch: 46, bearing: 18 };
+const REGIONAL_VIEW = { center: [-111.3, 52.35], zoom: 4.9, pitch: 25, bearing: 8 };
+const DISTRICT_VIEWS = {
+  Calgary: { center: [-114.0719, 51.0447], zoom: 11, pitch: 45, bearing: -15, duration: 3000, essential: true },
+  Edmonton: { center: [-113.4938, 53.5461], zoom: 11, pitch: 45, bearing: 18, duration: 3000, essential: true },
+};
+const BOTH_DISTRICTS_BOUNDS = [[-114.28, 50.82], [-113.25, 53.7]];
 const HOURS = Array.from({ length: 17 }, (_, index) => index + 8);
 const SPECIALTIES = { general: "Atención general", pediatrics: "🩺 Pediatría", trauma: "🦴 Trauma / cirugía", obstetrics: "♀ Gineco-obstétrica" };
 const CRITICAL_SERVICES = [
@@ -6,6 +11,7 @@ const CRITICAL_SERVICES = [
 ];
 const SATELLITE_STYLE = {
   version: 8,
+  projection: { type: "globe" },
   sources: {
     imagery: { type: "raster", tiles: ["https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}"], tileSize: 256, attribution: "Tiles © Esri" },
     transport: { type: "raster", tiles: ["https://services.arcgisonline.com/ArcGIS/rest/services/Reference/World_Transportation/MapServer/tile/{z}/{y}/{x}"], tileSize: 256 },
@@ -14,13 +20,13 @@ const SATELLITE_STYLE = {
   layers: [{ id: "imagery", type: "raster", source: "imagery" }, { id: "transport", type: "raster", source: "transport", minzoom: 12 }, { id: "labels", type: "raster", source: "labels", minzoom: 10 }],
 };
 
-let map, hospitals = [], patientLocation = null, selectedHospital = null, currentHour = 8, isPlaying = false, criticalEvent = false;
+let map, hospitals = [], patientLocation = null, selectedHospital = null, currentHour = 8, isPlaying = false, criticalEvent = false, activeDistrict = "all";
 
 const $ = (selector) => document.querySelector(selector);
 
 async function init() {
   if (!window.maplibregl) return showMessage("No se pudo cargar MapLibre GL JS.");
-  map = new maplibregl.Map({ container: "map", style: SATELLITE_STYLE, ...CITY_VIEW, minZoom: 3, maxZoom: 18, maxPitch: 75, dragRotate: true, pitchWithRotate: true, touchPitch: true });
+  map = new maplibregl.Map({ container: "map", style: SATELLITE_STYLE, ...REGIONAL_VIEW, minZoom: 3, maxZoom: 18, maxPitch: 75, dragRotate: true, pitchWithRotate: true, touchPitch: true });
   map.addControl(new maplibregl.NavigationControl({ visualizePitch: true }), "bottom-right");
   map.on("load", loadData);
   map.on("click", handleMapClick);
@@ -51,6 +57,7 @@ function addMapLayers() {
   map.on("click", "hospital-circles", (event) => selectHospital(byId(event.features[0].properties.id), true));
   map.on("mouseenter", "hospital-circles", () => map.getCanvas().style.cursor = "pointer");
   map.on("mouseleave", "hospital-circles", () => map.getCanvas().style.cursor = "");
+  applyDistrictFilter();
 }
 
 function hospitalGeoJSON() {
@@ -126,7 +133,8 @@ function getCurveValue(hospital, hour) { return hospital.hourly_curve[Math.max(0
 function refreshDashboard() {
   if (!map.getSource("hospitals")) return;
   map.getSource("hospitals").setData(hospitalGeoJSON());
-  const waits = hospitals.map(getWait), avg = waits.reduce((sum, wait) => sum + wait, 0) / waits.length, level = avg > 180 ? "critical" : avg >= 60 ? "moderate" : "optimal";
+  const visible = hospitals.filter((hospital) => activeDistrict === "all" || hospital.city === activeDistrict);
+  const waits = visible.map(getWait), avg = waits.reduce((sum, wait) => sum + wait, 0) / waits.length, level = avg > 180 ? "critical" : avg >= 60 ? "moderate" : "optimal";
   const badge = $("#network-stress"); badge.className = `stress-badge ${level}`; badge.textContent = `Estrés de la red: ${getStatus(avg).label} (${Math.round(Math.min(100,avg/2.4))}%)`;
   $("#time-label").textContent = `${String(currentHour).padStart(2,"0")}:00`;
   if (selectedHospital) renderDrawer(selectedHospital);
@@ -134,11 +142,32 @@ function refreshDashboard() {
 function toggleCriticalEvent() { criticalEvent = !criticalEvent; $("#critical-event-button").classList.toggle("active", criticalEvent); $("#critical-event-button").textContent = criticalEvent ? "✓ Evento crítico activo" : "⚠ Simular evento crítico"; refreshDashboard(); }
 function togglePlayback() { isPlaying=!isPlaying; $("#play-button").textContent=isPlaying?"Ⅱ":"▶"; }
 function showMessage(message) { const el=$("#map-message");el.textContent=message;el.hidden=false;setTimeout(()=>el.hidden=true,3400); }
+function applyDistrictFilter() {
+  if (!map.getLayer("hospital-circles")) return;
+  const filter = activeDistrict === "all" ? null : ["==", ["get", "city"], activeDistrict];
+  const pulseFilter = activeDistrict === "all" ? ["==", ["get", "status"], "critical"] : ["all", ["==", ["get", "status"], "critical"], filter];
+  map.setFilter("hospital-circles", filter); map.setFilter("hospital-pulse", pulseFilter);
+  map.setFilter("hospital-selected", selectedHospital && (activeDistrict === "all" || selectedHospital.city === activeDistrict) ? ["==", ["get", "id"], selectedHospital.id] : ["==", ["get", "id"], ""]);
+  refreshDashboard();
+}
+function selectDistrict(district, fromOnboarding = false) {
+  activeDistrict = district;
+  $("#district-select").value = district;
+  applyDistrictFilter();
+  if (district === "all") map.fitBounds(BOTH_DISTRICTS_BOUNDS, { padding: 80, pitch: 35, duration: 2500 });
+  else map.flyTo(DISTRICT_VIEWS[district]);
+  if (fromOnboarding) closeOnboarding();
+}
+function openOnboarding() { $("#onboarding").classList.remove("is-hidden"); }
+function closeOnboarding() { $("#onboarding").classList.add("is-hidden"); }
 function bindUI() {
   $("#map-origin-button").addEventListener("click", () => { $("#map-origin-button").classList.toggle("armed"); $("#origin-status").textContent=$("#map-origin-button").classList.contains("armed")?"Haz clic en el mapa para fijar el origen.":"Selecciona una ubicación o haz clic en el mapa."; });
   $("#geolocate-button").addEventListener("click", () => navigator.geolocation ? navigator.geolocation.getCurrentPosition((p)=>setPatientLocation([p.coords.longitude,p.coords.latitude],"Ubicación actual establecida."),()=>showMessage("No fue posible obtener tu ubicación."),{enableHighAccuracy:true,timeout:10000}) : showMessage("Tu navegador no permite geolocalización."));
   $("#calculate-button").addEventListener("click", calculateOptimalCenter); $("#critical-event-button").addEventListener("click",toggleCriticalEvent); $("#play-button").addEventListener("click",togglePlayback);
   $("#time-range").addEventListener("input",(e)=>{currentHour=Number(e.target.value);refreshDashboard();});
+  $("#district-select").addEventListener("change", (event) => selectDistrict(event.target.value));
+  $("#open-onboarding").addEventListener("click", openOnboarding);
+  document.querySelectorAll("[data-district]").forEach((button) => button.addEventListener("click", () => selectDistrict(button.dataset.district, true)));
   $("#close-drawer").addEventListener("click",()=>{$("#telemetry-drawer").hidden=true;selectedHospital=null;map.setFilter("hospital-selected",["==",["get","id"],""]);});
   setInterval(()=>{if(!isPlaying)return;currentHour=currentHour===24?8:currentHour+1;$("#time-range").value=currentHour;refreshDashboard();},1300);
 }

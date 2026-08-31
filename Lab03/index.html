@@ -11,9 +11,23 @@
     <div id="map" aria-label="Mapa satelital de la red hospitalaria"></div>
 
     <header class="topbar">
-      <div><p class="eyebrow">COMPUTACIÓN AVANZADA · MCD UAI</p><h1>Red de urgencias</h1></div>
+      <button id="open-onboarding" class="brand-button" type="button"><p class="eyebrow">COMPUTACIÓN AVANZADA · MCD UAI</p><h1>Red de urgencias</h1></button>
+      <label class="district-select">Localidad<select id="district-select"><option value="all">Todas las localidades</option><option value="Calgary">Calgary</option><option value="Edmonton">Edmonton</option></select></label>
       <div class="topbar-meta"><strong id="network-stress" class="stress-badge">Estrés de la red: —</strong><span class="live-dot"></span><span>Simulación activa</span></div>
     </header>
+
+    <section id="onboarding" class="onboarding" aria-modal="true" role="dialog" aria-labelledby="onboarding-title">
+      <div class="onboarding-card">
+        <p class="onboarding-badge">MCD COMPUTACIÓN AVANZADA</p>
+        <h2 id="onboarding-title">Sistema de Monitoreo y Derivación Hospitalaria</h2>
+        <p>Selecciona tu distrito o zona de visualización para inicializar la telemetría en tiempo real:</p>
+        <div class="district-cards">
+          <button type="button" data-district="Calgary"><b>🏙️ Calgary</b><span>Distrito Sur · Red Hospitalaria de Alberta</span><i>Inicializar →</i></button>
+          <button type="button" data-district="Edmonton"><b>🌲 Edmonton</b><span>Distrito Norte · Red Hospitalaria de Alberta</span><i>Inicializar →</i></button>
+          <button type="button" data-district="all" class="regional"><b>🌐 Ver ambos distritos</b><span>Sin localidad específica · Monitoreo regional</span><i>Vista general →</i></button>
+        </div>
+      </div>
+    </section>
 
     <aside class="route-panel glass-panel">
       <p class="eyebrow">TRIAGE INTELIGENTE</p><h2>Encuentra atención óptima</h2>
