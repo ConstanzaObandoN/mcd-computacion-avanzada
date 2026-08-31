@@ -3,31 +3,45 @@
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>Estado hospitalario · Alberta</title>
+    <title>Red de urgencias · Alberta</title>
     <link rel="stylesheet" href="https://unpkg.com/maplibre-gl@5.20.0/dist/maplibre-gl.css" />
     <link rel="stylesheet" href="./styles.css" />
   </head>
   <body>
-    <div id="map" aria-label="Mapa satelital de saturación hospitalaria"></div>
-    <header class="floating-panel">
-      <div class="brand"><p>COMPUTACIÓN AVANZADA · MCD UAI</p><h1>Estado hospitalario</h1></div>
-      <label for="city-filter"><span>Localidad</span><select id="city-filter"><option value="all">Todas las localidades</option><option value="Calgary">Calgary</option><option value="Edmonton">Edmonton</option></select></label>
-      <div class="legend" aria-label="Leyenda de saturación"><span><i class="dot optimal"></i>Óptimo <small>&lt; 1 h</small></span><span><i class="dot moderate"></i>Moderado <small>1–3 h</small></span><span><i class="dot critical"></i>Crítico <small>&gt; 3 h</small></span></div>
-      <strong id="network-stress" class="stress-badge">Estrés de la Red: —</strong>
-      <button id="recommend-button" class="recommend-button" type="button">Recomendar Centro Óptimo</button>
-      <div class="live"><i></i><span>Simulación en vivo</span><time id="last-update">—</time></div>
+    <div id="map" aria-label="Mapa satelital de la red hospitalaria"></div>
+
+    <header class="topbar">
+      <div><p class="eyebrow">COMPUTACIÓN AVANZADA · MCD UAI</p><h1>Red de urgencias</h1></div>
+      <div class="topbar-meta"><strong id="network-stress" class="stress-badge">Estrés de la red: —</strong><span class="live-dot"></span><span>Simulación activa</span></div>
     </header>
-    <aside id="map-message" class="map-message" hidden></aside>
-    <aside id="inspector" class="inspector" aria-live="polite" hidden>
-      <button id="close-inspector" class="close-inspector" type="button" aria-label="Cerrar panel">✕</button>
-      <p class="inspector-kicker" id="inspector-city">CENTRO HOSPITALARIO</p>
-      <h2 id="inspector-name">—</h2>
-      <p class="inspector-label">Tiempo estimado de espera</p>
-      <p class="inspector-wait" id="inspector-wait">—</p>
-      <div class="inspector-status" id="inspector-status">—</div>
-      <div class="capacity-card"><span>Pacientes en sala de espera</span><strong><b id="inspector-patients">—</b> / <b id="inspector-capacity">—</b></strong><div class="capacity-bar"><i id="capacity-fill"></i></div><small>Pacientes / capacidad operativa</small></div>
-      <section class="location-card"><span>Ubicación exacta</span><code id="inspector-coordinates">—</code><a id="google-maps-link" href="#" target="_blank" rel="noopener noreferrer">Abrir en Google Maps <b>↗</b></a></section>
+
+    <aside class="route-panel glass-panel">
+      <p class="eyebrow">TRIAGE INTELIGENTE</p><h2>Encuentra atención óptima</h2>
+      <label>Tipo de emergencia<select id="emergency-type"><option value="general">General</option><option value="pediatrics">Pediátrica</option><option value="trauma">Traumatología</option><option value="obstetrics">Gineco-obstétrica</option></select></label>
+      <div class="location-actions"><button id="geolocate-button" type="button">⌖ Usar mi ubicación actual</button><button id="map-origin-button" type="button" class="secondary">⌖ Marcar origen en el mapa</button></div>
+      <p id="origin-status" class="hint">Selecciona una ubicación o haz clic en el mapa.</p>
+      <button id="calculate-button" class="primary-action" type="button">Calcular centro óptimo <span>→</span></button>
+      <div id="recommendation" class="recommendation" hidden></div>
+      <p class="method-note">Costo estimado = traslado urbano + espera en urgencia.</p>
     </aside>
+
+    <aside id="telemetry-drawer" class="telemetry-drawer glass-panel" hidden>
+      <button id="close-drawer" class="close-button" type="button" aria-label="Cerrar panel">✕</button>
+      <p id="drawer-city" class="eyebrow">CENTRO DE SALUD</p><h2 id="drawer-name">—</h2>
+      <div class="drawer-head"><span id="drawer-type">—</span><strong id="drawer-status" class="status-badge">—</strong></div>
+      <div class="wait-block"><span>Espera estimada</span><strong id="drawer-wait">—</strong></div>
+      <section><h3>Disponibilidad crítica</h3><div id="specialty-badges" class="specialty-badges"></div></section>
+      <section class="trend-section"><div><h3>Tendencia de saturación</h3><span>6 h previas · 2 h proyección</span></div><canvas id="trend-chart" width="290" height="115" aria-label="Tendencia horaria de saturación"></canvas></section>
+      <section class="telemetry-grid"><div><span>En sala</span><strong id="drawer-patients">—</strong></div><div><span>Capacidad</span><strong id="drawer-capacity">—</strong></div><div><span>Ubicación</span><a id="maps-link" href="#" target="_blank" rel="noopener noreferrer">Abrir ruta ↗</a></div></section>
+    </aside>
+
+    <section class="time-control glass-panel">
+      <button id="play-button" type="button" aria-label="Reproducir simulación">▶</button>
+      <div class="time-slider"><div><span>Control temporal</span><strong id="time-label">08:00</strong></div><input id="time-range" type="range" min="8" max="24" value="8" step="1" /></div>
+      <button id="critical-event-button" class="event-button" type="button">⚠ Simular evento crítico</button>
+    </section>
+
+    <aside id="map-message" class="map-message" hidden></aside>
     <script src="https://unpkg.com/maplibre-gl@5.20.0/dist/maplibre-gl.js"></script>
     <script src="./main.js"></script>
   </body>
