@@ -1,0 +1,217 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <title>DOM Play-Doh Colaborativo - Pantalla Central</title>
+  <style>
+    body { margin: 0; overflow: hidden; background: #0b0f19; color: white; font-family: system-ui, -apple-system, sans-serif; }
+    
+    #panel {
+      position: absolute;
+      top: 15px;
+      left: 15px;
+      z-index: 10;
+      background: rgba(15, 23, 42, 0.92);
+      backdrop-filter: blur(8px);
+      padding: 16px 20px;
+      border-radius: 12px;
+      border: 1px solid #334155;
+      width: 290px;
+      box-shadow: 0 4px 20px rgba(0,0,0,0.5);
+    }
+    h3 { margin: 0 0 8px 0; font-size: 16px; color: #f97316; }
+    .stat { font-size: 13px; color: #94a3b8; margin-top: 4px; }
+    .stat strong { color: #38bdf8; }
+    
+    .btn-reset {
+      background: #ef4444;
+      color: white;
+      border: none;
+      padding: 8px 12px;
+      border-radius: 6px;
+      font-weight: bold;
+      cursor: pointer;
+      margin-top: 12px;
+      width: 100%;
+      transition: background 0.2s;
+    }
+    .btn-reset:hover { background: #dc2626; }
+  </style>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/controls/OrbitControls.js"></script>
+  <script src="https://unpkg.com/mqtt/dist/mqtt.min.js"></script>
+</head>
+<body>
+
+  <div id="panel">
+    <h3>🎨 Escultura Play-Doh Colectiva</h3>
+    <div class="stat">Manos conectadas: <strong id="userCount">0</strong></div>
+    <div class="stat">Acción: <strong id="lastAction">Esperando colaboradores...</strong></div>
+    <div class="stat" style="font-size:11px; color:#64748b; margin-top:8px;">Arrastra con el mouse para rotar la escultura.</div>
+    <button class="btn-reset" onclick="resetSphere()">🔄 Nueva Bola de Masa</button>
+  </div>
+
+  <script>
+    // 1. Escena Three.js y Cámara
+    const scene = new THREE.Scene();
+    const camera = new THREE.PerspectiveCamera(45, window.innerWidth / window.innerHeight, 0.1, 1000);
+    camera.position.set(0, 0, 5.5);
+
+    const renderer = new THREE.WebGLRenderer({ antialias: true, powerPreference: "high-performance" });
+    renderer.setSize(window.innerWidth, window.innerHeight);
+    renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+    document.body.appendChild(renderer.domElement);
+
+    const controls = new THREE.OrbitControls(camera, renderer.domElement);
+    controls.enableDamping = true;
+
+    // Luces de estudio para dar volumen a la plastilina
+    scene.add(new THREE.AmbientLight(0xffffff, 0.7));
+
+    const lightFront = new THREE.DirectionalLight(0xfff7ed, 1.4);
+    lightFront.position.set(4, 6, 6);
+    scene.add(lightFront);
+
+    const lightRim = new THREE.DirectionalLight(0x38bdf8, 0.6);
+    lightRim.position.set(-4, -4, -3);
+    scene.add(lightRim);
+
+    // 2. Esfera Sólida Play-Doh
+    const RADIUS = 1.6;
+    const geometry = new THREE.SphereGeometry(RADIUS, 120, 120);
+    const originalPositions = geometry.attributes.position.clone();
+
+    const material = new THREE.MeshStandardMaterial({
+      color: 0xf97316,
+      roughness: 0.8,
+      metalness: 0.05,
+      wireframe: false
+    });
+
+    const sphereMesh = new THREE.Mesh(geometry, material);
+    scene.add(sphereMesh);
+
+    // Punteros visuales para ver la posición de cada mano en el aire
+    const userPointers = new Map();
+
+    function getOrCreatePointer(id) {
+      if (!userPointers.has(id)) {
+        const pGeo = new THREE.SphereGeometry(0.08, 16, 16);
+        const pMat = new THREE.MeshBasicMaterial({ color: 0x38bdf8, transparent: true, opacity: 0.85 });
+        const pMesh = new THREE.Mesh(pGeo, pMat);
+        scene.add(pMesh);
+        userPointers.set(id, { mesh: pMesh, lastSeen: Date.now() });
+      }
+      const ptr = userPointers.get(id);
+      ptr.lastSeen = Date.now();
+      return ptr.mesh;
+    }
+
+    // 3. Deformación Plástica Permanente
+    function deformarMasa(hit, brushRadius, fuerza, modo) {
+      if (!hit || fuerza <= 0) return;
+      
+      const pos = geometry.attributes.position;
+      const direccion = modo === "pull" ? 1 : -1;
+      const desplazamientoBase = 0.04 * fuerza * direccion;
+
+      for (let i = 0; i < pos.count; i++) {
+        const vx = pos.getX(i);
+        const vy = pos.getY(i);
+        const vz = pos.getZ(i);
+
+        const dist = Math.hypot(vx - hit.x, vy - hit.y, vz - hit.z);
+
+        if (dist < brushRadius) {
+          const intensidad = Math.exp(-(dist * dist) / (2 * (brushRadius * 0.45) * (brushRadius * 0.45)));
+          const delta = desplazamientoBase * intensidad;
+
+          const norma = Math.hypot(vx, vy, vz) || 1;
+          pos.setXYZ(i, vx + (vx / norma) * delta, vy + (vy / norma) * delta, vz + (vz / norma) * delta);
+        }
+      }
+
+      pos.needsUpdate = true;
+      geometry.computeVertexNormals();
+    }
+
+    // 4. Conexión MQTT
+    const userCountEl = document.getElementById("userCount");
+    const lastActionEl = document.getElementById("lastAction");
+    const TOPIC = "mcd/dom/shared_mesh";
+
+    const client = mqtt.connect("wss://broker.emqx.io:8084/mqtt", {
+      clientId: "host_screen_" + Math.random().toString(16).substring(2, 6),
+      clean: true
+    });
+
+    client.on("connect", () => {
+      client.subscribe(TOPIC);
+    });
+
+    client.on("message", (topic, message) => {
+      try {
+        const data = JSON.parse(message.toString());
+
+        if (data.hitPos) {
+          // Actualizar puntero 3D de la mano en pantalla
+          const pMesh = getOrCreatePointer(data.id);
+          pMesh.position.set(data.hitPos.x, data.hitPos.y, 1.65);
+
+          if (data.force > 0.1) {
+            // Cambiar puntero a naranja cuando pellizca
+            pMesh.material.color.setHex(0xf97316);
+            pMesh.scale.set(1.4, 1.4, 1.4);
+            lastActionEl.innerText = `Amasando: ${data.id} (${Math.round(data.force * 100)}%)`;
+            deformarMasa(data.hitPos, data.radius || 0.65, data.force, data.mode || "push");
+          } else {
+            // Puntero azul celeste en reposo (apuntando)
+            pMesh.material.color.setHex(0x38bdf8);
+            pMesh.scale.set(1.0, 1.0, 1.0);
+          }
+        }
+      } catch (e) {
+        console.error("Error procesando paquete:", e);
+      }
+    });
+
+    // 5. Reiniciar Esfera
+    function resetSphere() {
+      const pos = geometry.attributes.position;
+      const orig = originalPositions;
+      for (let i = 0; i < pos.count; i++) {
+        pos.setXYZ(i, orig.getX(i), orig.getY(i), orig.getZ(i));
+      }
+      pos.needsUpdate = true;
+      geometry.computeVertexNormals();
+      lastActionEl.innerText = "Masa reiniciada";
+    }
+
+    // 6. Bucle de Render
+    function animate() {
+      requestAnimationFrame(animate);
+
+      // Limpiar punteros inactivos de colaboradores desconectados
+      const now = Date.now();
+      for (const [id, ptr] of userPointers.entries()) {
+        if (now - ptr.lastSeen > 3000) {
+          scene.remove(ptr.mesh);
+          userPointers.delete(id);
+        }
+      }
+      userCountEl.innerText = userPointers.size;
+
+      controls.update();
+      renderer.render(scene, camera);
+    }
+
+    animate();
+
+    window.addEventListener("resize", () => {
+      camera.aspect = window.innerWidth / window.innerHeight;
+      camera.updateProjectionMatrix();
+      renderer.setSize(window.innerWidth, window.innerHeight);
+    });
+  </script>
+</body>
+</html>
