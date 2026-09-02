@@ -2,216 +2,245 @@
 <html lang="es">
 <head>
   <meta charset="UTF-8">
-  <title>DOM Play-Doh Colaborativo - Pantalla Central</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+  <title>Detector Bimanual - DOM Sculpt</title>
   <style>
-    body { margin: 0; overflow: hidden; background: #0b0f19; color: white; font-family: system-ui, -apple-system, sans-serif; }
+    body { margin: 0; background: #0b0f19; color: white; font-family: system-ui, sans-serif; overflow: hidden; }
+    #cameraView { position: relative; width: 100vw; height: 72vh; background: #000; }
+    video, canvas { position: absolute; top: 0; left: 0; width: 100%; height: 100%; object-fit: cover; transform: scaleX(-1); }
     
-    #panel {
+    #panelInfo {
       position: absolute;
-      top: 15px;
-      left: 15px;
-      z-index: 10;
-      background: rgba(15, 23, 42, 0.92);
-      backdrop-filter: blur(8px);
-      padding: 16px 20px;
-      border-radius: 12px;
-      border: 1px solid #334155;
-      width: 290px;
-      box-shadow: 0 4px 20px rgba(0,0,0,0.5);
+      bottom: 0;
+      left: 0;
+      right: 0;
+      height: 28vh;
+      background: rgba(15, 23, 42, 0.95);
+      border-top: 1px solid #334155;
+      padding: 10px 14px;
+      box-sizing: border-box;
+      display: flex;
+      flex-direction: column;
+      justify-content: space-between;
     }
-    h3 { margin: 0 0 8px 0; font-size: 16px; color: #f97316; }
-    .stat { font-size: 13px; color: #94a3b8; margin-top: 4px; }
-    .stat strong { color: #38bdf8; }
+    .status-row { display: flex; justify-content: space-between; align-items: center; font-size: 12px; }
+    .badge { padding: 3px 8px; border-radius: 6px; font-weight: bold; font-size: 11px; }
+    .badge-ok { background: #065f46; color: #34d399; }
     
-    .btn-reset {
-      background: #ef4444;
-      color: white;
-      border: none;
-      padding: 8px 12px;
-      border-radius: 6px;
-      font-weight: bold;
-      cursor: pointer;
-      margin-top: 12px;
-      width: 100%;
-      transition: background 0.2s;
-    }
-    .btn-reset:hover { background: #dc2626; }
+    .hands-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+    .hand-card { background: #1e293b; padding: 8px; border-radius: 8px; font-size: 11px; border: 1px solid #334155; }
+    .hand-card strong { color: #38bdf8; }
+    .gesture-tag { display: inline-block; margin-top: 4px; padding: 2px 6px; border-radius: 4px; font-weight: bold; font-size: 11px; }
+    .tag-idle { background: #475569; color: #cbd5e1; }
+    .tag-push { background: #b91c1c; color: #fecaca; }
+    .tag-pull { background: #1d4ed8; color: #bfdbfe; }
   </style>
-  <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
-  <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/controls/OrbitControls.js"></script>
+
+  <script src="https://cdn.jsdelivr.net/npm/@mediapipe/camera_utils/camera_utils.js" crossorigin="anonymous"></script>
+  <script src="https://cdn.jsdelivr.net/npm/@mediapipe/hands/hands.js" crossorigin="anonymous"></script>
   <script src="https://unpkg.com/mqtt/dist/mqtt.min.js"></script>
 </head>
 <body>
 
-  <div id="panel">
-    <h3>🎨 Escultura Play-Doh Colectiva</h3>
-    <div class="stat">Manos conectadas: <strong id="userCount">0</strong></div>
-    <div class="stat">Acción: <strong id="lastAction">Esperando colaboradores...</strong></div>
-    <div class="stat" style="font-size:11px; color:#64748b; margin-top:8px;">Arrastra con el mouse para rotar la escultura.</div>
-    <button class="btn-reset" onclick="resetSphere()">🔄 Nueva Bola de Masa</button>
+  <div id="cameraView">
+    <video id="webcam" playsinline muted></video>
+    <canvas id="outputCanvas"></canvas>
+  </div>
+
+  <div id="panelInfo">
+    <div class="status-row">
+      <span>📡 Broker EMQX:</span>
+      <span id="netStatus" class="badge badge-ok">Conectando...</span>
+    </div>
+
+    <div class="hands-grid">
+      <div class="hand-card" id="cardH0">
+        <div><strong>Mano 1:</strong> <span id="labelH0">No detectada</span></div>
+        <div id="gestureH0" class="gesture-tag tag-idle">Reposo</div>
+      </div>
+      <div class="hand-card" id="cardH1">
+        <div><strong>Mano 2:</strong> <span id="labelH1">No detectada</span></div>
+        <div id="gestureH1" class="gesture-tag tag-idle">Reposo</div>
+      </div>
+    </div>
+
+    <div style="font-size:11px; color:#94a3b8; text-align:center;">
+      ☝️ <strong>1 dedo extendido:</strong> Hundir masa | 🤏 <strong>Pinza 2/3 dedos:</strong> Estirar masa
+    </div>
   </div>
 
   <script>
-    // 1. Escena Three.js y Cámara
-    const scene = new THREE.Scene();
-    const camera = new THREE.PerspectiveCamera(45, window.innerWidth / window.innerHeight, 0.1, 1000);
-    camera.position.set(0, 0, 5.5);
-
-    const renderer = new THREE.WebGLRenderer({ antialias: true, powerPreference: "high-performance" });
-    renderer.setSize(window.innerWidth, window.innerHeight);
-    renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
-    document.body.appendChild(renderer.domElement);
-
-    const controls = new THREE.OrbitControls(camera, renderer.domElement);
-    controls.enableDamping = true;
-
-    // Luces de estudio para dar volumen a la plastilina
-    scene.add(new THREE.AmbientLight(0xffffff, 0.7));
-
-    const lightFront = new THREE.DirectionalLight(0xfff7ed, 1.4);
-    lightFront.position.set(4, 6, 6);
-    scene.add(lightFront);
-
-    const lightRim = new THREE.DirectionalLight(0x38bdf8, 0.6);
-    lightRim.position.set(-4, -4, -3);
-    scene.add(lightRim);
-
-    // 2. Esfera Sólida Play-Doh
-    const RADIUS = 1.6;
-    const geometry = new THREE.SphereGeometry(RADIUS, 120, 120);
-    const originalPositions = geometry.attributes.position.clone();
-
-    const material = new THREE.MeshStandardMaterial({
-      color: 0xf97316,
-      roughness: 0.8,
-      metalness: 0.05,
-      wireframe: false
-    });
-
-    const sphereMesh = new THREE.Mesh(geometry, material);
-    scene.add(sphereMesh);
-
-    // Punteros visuales para ver la posición de cada mano en el aire
-    const userPointers = new Map();
-
-    function getOrCreatePointer(id) {
-      if (!userPointers.has(id)) {
-        const pGeo = new THREE.SphereGeometry(0.08, 16, 16);
-        const pMat = new THREE.MeshBasicMaterial({ color: 0x38bdf8, transparent: true, opacity: 0.85 });
-        const pMesh = new THREE.Mesh(pGeo, pMat);
-        scene.add(pMesh);
-        userPointers.set(id, { mesh: pMesh, lastSeen: Date.now() });
-      }
-      const ptr = userPointers.get(id);
-      ptr.lastSeen = Date.now();
-      return ptr.mesh;
-    }
-
-    // 3. Deformación Plástica Permanente
-    function deformarMasa(hit, brushRadius, fuerza, modo) {
-      if (!hit || fuerza <= 0) return;
-      
-      const pos = geometry.attributes.position;
-      const direccion = modo === "pull" ? 1 : -1;
-      const desplazamientoBase = 0.04 * fuerza * direccion;
-
-      for (let i = 0; i < pos.count; i++) {
-        const vx = pos.getX(i);
-        const vy = pos.getY(i);
-        const vz = pos.getZ(i);
-
-        const dist = Math.hypot(vx - hit.x, vy - hit.y, vz - hit.z);
-
-        if (dist < brushRadius) {
-          const intensidad = Math.exp(-(dist * dist) / (2 * (brushRadius * 0.45) * (brushRadius * 0.45)));
-          const delta = desplazamientoBase * intensidad;
-
-          const norma = Math.hypot(vx, vy, vz) || 1;
-          pos.setXYZ(i, vx + (vx / norma) * delta, vy + (vy / norma) * delta, vz + (vz / norma) * delta);
-        }
-      }
-
-      pos.needsUpdate = true;
-      geometry.computeVertexNormals();
-    }
-
-    // 4. Conexión MQTT
-    const userCountEl = document.getElementById("userCount");
-    const lastActionEl = document.getElementById("lastAction");
+    const USER_ID = "usr_" + Math.random().toString(16).substring(2, 6);
     const TOPIC = "mcd/dom/shared_mesh";
 
+    const videoElement = document.getElementById("webcam");
+    const canvasElement = document.getElementById("outputCanvas");
+    const canvasCtx = canvasElement.getContext("2d");
+    const netStatus = document.getElementById("netStatus");
+
+    // 1. MQTT EMQX
     const client = mqtt.connect("wss://broker.emqx.io:8084/mqtt", {
-      clientId: "host_screen_" + Math.random().toString(16).substring(2, 6),
+      clientId: USER_ID,
       clean: true
     });
 
     client.on("connect", () => {
-      client.subscribe(TOPIC);
+      netStatus.innerText = "🟢 Conectado (" + USER_ID + ")";
     });
 
-    client.on("message", (topic, message) => {
-      try {
-        const data = JSON.parse(message.toString());
+    const HAND_CONNECTIONS = [
+      [0,1],[1,2],[2,3],[3,4],[0,5],[5,6],[6,7],[7,8],
+      [5,9],[9,10],[10,11],[11,12],[9,13],[13,14],[14,15],[15,16],
+      [13,17],[17,18],[18,19],[19,20],[0,17]
+    ];
 
-        if (data.hitPos) {
-          // Actualizar puntero 3D de la mano en pantalla
-          const pMesh = getOrCreatePointer(data.id);
-          pMesh.position.set(data.hitPos.x, data.hitPos.y, 1.65);
+    // Clasificador Biomecánico de Gestos
+    function clasificarGesto(lm) {
+      const wrist = lm[0];
+      const palmSize = Math.hypot(wrist.x - lm[9].x, wrist.y - lm[9].y) || 0.1;
 
-          if (data.force > 0.1) {
-            // Cambiar puntero a naranja cuando pellizca
-            pMesh.material.color.setHex(0xf97316);
-            pMesh.scale.set(1.4, 1.4, 1.4);
-            lastActionEl.innerText = `Amasando: ${data.id} (${Math.round(data.force * 100)}%)`;
-            deformarMasa(data.hitPos, data.radius || 0.65, data.force, data.mode || "push");
-          } else {
-            // Puntero azul celeste en reposo (apuntando)
-            pMesh.material.color.setHex(0x38bdf8);
-            pMesh.scale.set(1.0, 1.0, 1.0);
+      // Estado de extensión de cada dedo (comparando distancia yema-muñeca vs nudillo-muñeca)
+      const isExtended = (tipIdx, pipIdx) => {
+        return Math.hypot(lm[tipIdx].x - wrist.x, lm[tipIdx].y - wrist.y) >
+               Math.hypot(lm[pipIdx].x - wrist.x, lm[pipIdx].y - wrist.y);
+      };
+
+      const thumbExtended = isExtended(4, 2);
+      const indexExtended = isExtended(8, 6);
+      const middleExtended = isExtended(12, 10);
+      const ringExtended = isExtended(16, 14);
+      const pinkyExtended = isExtended(20, 18);
+
+      // Distancia entre puntas para Pinza (normalizada respecto a la palma)
+      const distThumbIndex = Math.hypot(lm[4].x - lm[8].x, lm[4].y - lm[8].y) / palmSize;
+      const distThumbMiddle = Math.hypot(lm[4].x - lm[12].x, lm[4].y - lm[12].y) / palmSize;
+
+      // 1. GESTO ESTIRAR (PULL): Pinza de 2 o 3 dedos
+      const pinch2D = distThumbIndex < 0.35;
+      const pinch3D = distThumbIndex < 0.40 && distThumbMiddle < 0.45;
+
+      if (pinch2D || pinch3D) {
+        return {
+          action: "pull",
+          label: pinch3D ? "Pinza 3 dedos (Estirar)" : "Pinza 2 dedos (Estirar)",
+          point: { x: (lm[4].x + lm[8].x) / 2, y: (lm[4].y + lm[8].y) / 2 },
+          force: 1.0
+        };
+      }
+
+      // 2. GESTO HUNDIR (PUSH): Solo dedo índice extendido (pinchando)
+      if (indexExtended && !middleExtended && !ringExtended && !pinkyExtended) {
+        return {
+          action: "push",
+          label: "Pinchando con 1 dedo (Hundir)",
+          point: { x: lm[8].x, y: lm[8].y },
+          force: 0.9
+        };
+      }
+
+      // 3. REPOSO: Mano abierta o en otra postura neutra
+      return {
+        action: "idle",
+        label: "Mano en reposo",
+        point: { x: lm[9].x, y: lm[9].y },
+        force: 0.0
+      };
+    }
+
+    // 2. Bucle de Detección MediaPipe
+    function onResults(results) {
+      canvasCtx.save();
+      canvasCtx.clearRect(0, 0, canvasElement.width, canvasElement.height);
+
+      const detectedCount = results.multiHandLandmarks ? results.multiHandLandmarks.length : 0;
+
+      // Reset tarjetas visuales
+      for (let h = 0; h < 2; h++) {
+        const lbl = document.getElementById("labelH" + h);
+        const gst = document.getElementById("gestureH" + h);
+        if (h >= detectedCount) {
+          lbl.innerText = "No detectada";
+          gst.className = "gesture-tag tag-idle";
+          gst.innerText = "Inactiva";
+        }
+      }
+
+      if (detectedCount > 0) {
+        for (let h = 0; h < detectedCount; h++) {
+          const lm = results.multiHandLandmarks[h];
+          const gesto = clasificarGesto(lm);
+
+          // Actualizar feedback en UI móvil
+          const lbl = document.getElementById("labelH" + h);
+          const gst = document.getElementById("gestureH" + h);
+          lbl.innerText = "Detectada";
+          gst.innerText = gesto.label;
+          gst.className = "gesture-tag " + (gesto.action === "push" ? "tag-push" : gesto.action === "pull" ? "tag-pull" : "tag-idle");
+
+          // Dibujar esqueleto
+          canvasCtx.strokeStyle = gesto.action === "push" ? "#ef4444" : gesto.action === "pull" ? "#38bdf8" : "#64748b";
+          canvasCtx.lineWidth = 3;
+          for (const [s, e] of HAND_CONNECTIONS) {
+            canvasCtx.beginPath();
+            canvasCtx.moveTo(lm[s].x * canvasElement.width, lm[s].y * canvasElement.height);
+            canvasCtx.lineTo(lm[e].x * canvasElement.width, lm[e].y * canvasElement.height);
+            canvasCtx.stroke();
+          }
+
+          // Dibujar punto activo
+          canvasCtx.beginPath();
+          canvasCtx.arc(gesto.point.x * canvasElement.width, gesto.point.y * canvasElement.height, 9, 0, 2 * Math.PI);
+          canvasCtx.fillStyle = gesto.action === "push" ? "#ef4444" : gesto.action === "pull" ? "#38bdf8" : "#94a3b8";
+          canvasCtx.fill();
+
+          // Enviar por MQTT a EMQX
+          if (client.connected) {
+            client.publish(TOPIC, JSON.stringify({
+              id: `${USER_ID}_h${h}`,
+              rawUserId: USER_ID,
+              handIndex: h,
+              action: gesto.action,
+              label: gesto.label,
+              hitPos: {
+                x: Number(((gesto.point.x - 0.5) * 3.2).toFixed(3)),
+                y: Number((-(gesto.point.y - 0.5) * 3.2).toFixed(3)),
+                z: 1.0
+              },
+              radius: gesto.action === "push" ? 0.45 : 0.65, // El dedo pincha en un área más pequeña
+              force: gesto.force
+            }));
           }
         }
-      } catch (e) {
-        console.error("Error procesando paquete:", e);
       }
-    });
 
-    // 5. Reiniciar Esfera
-    function resetSphere() {
-      const pos = geometry.attributes.position;
-      const orig = originalPositions;
-      for (let i = 0; i < pos.count; i++) {
-        pos.setXYZ(i, orig.getX(i), orig.getY(i), orig.getZ(i));
-      }
-      pos.needsUpdate = true;
-      geometry.computeVertexNormals();
-      lastActionEl.innerText = "Masa reiniciada";
+      canvasCtx.restore();
     }
 
-    // 6. Bucle de Render
-    function animate() {
-      requestAnimationFrame(animate);
-
-      // Limpiar punteros inactivos de colaboradores desconectados
-      const now = Date.now();
-      for (const [id, ptr] of userPointers.entries()) {
-        if (now - ptr.lastSeen > 3000) {
-          scene.remove(ptr.mesh);
-          userPointers.delete(id);
-        }
-      }
-      userCountEl.innerText = userPointers.size;
-
-      controls.update();
-      renderer.render(scene, camera);
-    }
-
-    animate();
-
-    window.addEventListener("resize", () => {
-      camera.aspect = window.innerWidth / window.innerHeight;
-      camera.updateProjectionMatrix();
-      renderer.setSize(window.innerWidth, window.innerHeight);
+    // Inicializar MediaPipe con soporte para 2 manos simultáneas
+    const hands = new Hands({
+      locateFile: (file) => `https://cdn.jsdelivr.net/npm/@mediapipe/hands/${file}`
     });
+
+    hands.setOptions({
+      maxNumHands: 2,
+      modelComplexity: 1,
+      minDetectionConfidence: 0.5,
+      minTrackingConfidence: 0.5
+    });
+
+    hands.onResults(onResults);
+
+    const cameraFeed = new Camera(videoElement, {
+      onFrame: async () => {
+        canvasElement.width = videoElement.videoWidth;
+        canvasElement.height = videoElement.videoHeight;
+        await hands.send({ image: videoElement });
+      },
+      width: 640,
+      height: 480
+    });
+
+    cameraFeed.start();
   </script>
 </body>
 </html>
