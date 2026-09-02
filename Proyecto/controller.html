@@ -3,12 +3,34 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
-  <title>Detector Bimanual - DOM Sculpt</title>
+  <title>Controlador Gestual - DOM Estrella</title>
   <style>
-    body { margin: 0; background: #0b0f19; color: white; font-family: system-ui, sans-serif; overflow: hidden; }
-    #cameraView { position: relative; width: 100vw; height: 72vh; background: #000; }
-    video, canvas { position: absolute; top: 0; left: 0; width: 100%; height: 100%; object-fit: cover; transform: scaleX(-1); }
+    body {
+      margin: 0;
+      background: #0b0f19;
+      color: white;
+      font-family: system-ui, -apple-system, sans-serif;
+      overflow: hidden;
+      touch-action: none;
+    }
     
+    #cameraView {
+      position: relative;
+      width: 100vw;
+      height: 72vh;
+      background: #000;
+    }
+    
+    video, canvas {
+      position: absolute;
+      top: 0;
+      left: 0;
+      width: 100%;
+      height: 100%;
+      object-fit: cover;
+      transform: scaleX(-1);
+    }
+
     #panelInfo {
       position: absolute;
       bottom: 0;
@@ -16,6 +38,7 @@
       right: 0;
       height: 28vh;
       background: rgba(15, 23, 42, 0.95);
+      backdrop-filter: blur(8px);
       border-top: 1px solid #334155;
       padding: 10px 14px;
       box-sizing: border-box;
@@ -23,19 +46,58 @@
       flex-direction: column;
       justify-content: space-between;
     }
-    .status-row { display: flex; justify-content: space-between; align-items: center; font-size: 12px; }
-    .badge { padding: 3px 8px; border-radius: 6px; font-weight: bold; font-size: 11px; }
+
+    .status-row {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      font-size: 12px;
+    }
+
+    .badge {
+      padding: 3px 8px;
+      border-radius: 6px;
+      font-weight: bold;
+      font-size: 11px;
+    }
     .badge-ok { background: #065f46; color: #34d399; }
-    
-    .hands-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
-    .hand-card { background: #1e293b; padding: 8px; border-radius: 8px; font-size: 11px; border: 1px solid #334155; }
+    .badge-wait { background: #854d0e; color: #fde047; }
+
+    .hands-grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 8px;
+    }
+
+    .hand-card {
+      background: #1e293b;
+      padding: 8px;
+      border-radius: 8px;
+      font-size: 11px;
+      border: 1px solid #334155;
+    }
     .hand-card strong { color: #38bdf8; }
-    .gesture-tag { display: inline-block; margin-top: 4px; padding: 2px 6px; border-radius: 4px; font-weight: bold; font-size: 11px; }
+
+    .gesture-tag {
+      display: inline-block;
+      margin-top: 4px;
+      padding: 2px 6px;
+      border-radius: 4px;
+      font-weight: bold;
+      font-size: 11px;
+    }
     .tag-idle { background: #475569; color: #cbd5e1; }
     .tag-push { background: #b91c1c; color: #fecaca; }
     .tag-pull { background: #1d4ed8; color: #bfdbfe; }
+
+    .help-hint {
+      font-size: 11px;
+      color: #94a3b8;
+      text-align: center;
+    }
   </style>
 
+  <!-- MediaPipe Hands & Camera Utils -->
   <script src="https://cdn.jsdelivr.net/npm/@mediapipe/camera_utils/camera_utils.js" crossorigin="anonymous"></script>
   <script src="https://cdn.jsdelivr.net/npm/@mediapipe/hands/hands.js" crossorigin="anonymous"></script>
   <script src="https://unpkg.com/mqtt/dist/mqtt.min.js"></script>
@@ -49,23 +111,23 @@
 
   <div id="panelInfo">
     <div class="status-row">
-      <span>📡 Broker EMQX:</span>
-      <span id="netStatus" class="badge badge-ok">Conectando...</span>
+      <span>📡 EMQX Broker:</span>
+      <span id="netStatus" class="badge badge-wait">Conectando...</span>
     </div>
 
     <div class="hands-grid">
       <div class="hand-card" id="cardH0">
-        <div><strong>Mano 1:</strong> <span id="labelH0">No detectada</span></div>
+        <div><strong>Mano 1:</strong> <span id="labelH0">Buscando...</span></div>
         <div id="gestureH0" class="gesture-tag tag-idle">Reposo</div>
       </div>
       <div class="hand-card" id="cardH1">
-        <div><strong>Mano 2:</strong> <span id="labelH1">No detectada</span></div>
+        <div><strong>Mano 2:</strong> <span id="labelH1">Buscando...</span></div>
         <div id="gestureH1" class="gesture-tag tag-idle">Reposo</div>
       </div>
     </div>
 
-    <div style="font-size:11px; color:#94a3b8; text-align:center;">
-      ☝️ <strong>1 dedo extendido:</strong> Hundir masa | 🤏 <strong>Pinza 2/3 dedos:</strong> Estirar masa
+    <div class="help-hint">
+      ☝️ <strong>1 dedo:</strong> Hunde masa | 🤏 <strong>Pinza:</strong> Jala punta de estrella
     </div>
   </div>
 
@@ -78,13 +140,14 @@
     const canvasCtx = canvasElement.getContext("2d");
     const netStatus = document.getElementById("netStatus");
 
-    // 1. MQTT EMQX
+    // 1. Conexión MQTT
     const client = mqtt.connect("wss://broker.emqx.io:8084/mqtt", {
       clientId: USER_ID,
       clean: true
     });
 
     client.on("connect", () => {
+      netStatus.className = "badge badge-ok";
       netStatus.innerText = "🟢 Conectado (" + USER_ID + ")";
     });
 
@@ -94,90 +157,113 @@
       [13,17],[17,18],[18,19],[19,20],[0,17]
     ];
 
-    // Clasificador Biomecánico de Gestos
+    // Clasificación Biomecánica
     function clasificarGesto(lm) {
       const wrist = lm[0];
       const palmSize = Math.hypot(wrist.x - lm[9].x, wrist.y - lm[9].y) || 0.1;
 
-      // Estado de extensión de cada dedo (comparando distancia yema-muñeca vs nudillo-muñeca)
-      const isExtended = (tipIdx, pipIdx) => {
-        return Math.hypot(lm[tipIdx].x - wrist.x, lm[tipIdx].y - wrist.y) >
-               Math.hypot(lm[pipIdx].x - wrist.x, lm[pipIdx].y - wrist.y);
+      // Estado de extensión relativo a la muñeca
+      const isExtended = (tip, pip) => {
+        return Math.hypot(lm[tip].x - wrist.x, lm[tip].y - wrist.y) >
+               Math.hypot(lm[pip].x - wrist.x, lm[pip].y - wrist.y);
       };
 
-      const thumbExtended = isExtended(4, 2);
-      const indexExtended = isExtended(8, 6);
-      const middleExtended = isExtended(12, 10);
-      const ringExtended = isExtended(16, 14);
-      const pinkyExtended = isExtended(20, 18);
+      const indexExt = isExtended(8, 6);
+      const middleExt = isExtended(12, 10);
+      const ringExt = isExtended(16, 14);
+      const pinkyExt = isExtended(20, 18);
 
-      // Distancia entre puntas para Pinza (normalizada respecto a la palma)
+      // Pinza: Distancia entre pulgar y dedos índice/medio normalizada a la palma
       const distThumbIndex = Math.hypot(lm[4].x - lm[8].x, lm[4].y - lm[8].y) / palmSize;
       const distThumbMiddle = Math.hypot(lm[4].x - lm[12].x, lm[4].y - lm[12].y) / palmSize;
 
-      // 1. GESTO ESTIRAR (PULL): Pinza de 2 o 3 dedos
       const pinch2D = distThumbIndex < 0.35;
       const pinch3D = distThumbIndex < 0.40 && distThumbMiddle < 0.45;
 
+      // Acción 1: Jalar / Estirar (Pinza activa)
       if (pinch2D || pinch3D) {
         return {
           action: "pull",
-          label: pinch3D ? "Pinza 3 dedos (Estirar)" : "Pinza 2 dedos (Estirar)",
+          label: pinch3D ? "Pinza 3 dedos" : "Pinza 2 dedos",
           point: { x: (lm[4].x + lm[8].x) / 2, y: (lm[4].y + lm[8].y) / 2 },
           force: 1.0
         };
       }
 
-      // 2. GESTO HUNDIR (PUSH): Solo dedo índice extendido (pinchando)
-      if (indexExtended && !middleExtended && !ringExtended && !pinkyExtended) {
+      // Acción 2: Hundir (Solo índice extendido como punzón)
+      if (indexExt && !middleExt && !ringExt && !pinkyExt) {
         return {
           action: "push",
-          label: "Pinchando con 1 dedo (Hundir)",
+          label: "Puntazo (Hundir)",
           point: { x: lm[8].x, y: lm[8].y },
           force: 0.9
         };
       }
 
-      // 3. REPOSO: Mano abierta o en otra postura neutra
+      // Reposo
       return {
         action: "idle",
-        label: "Mano en reposo",
+        label: "Reposo",
         point: { x: lm[9].x, y: lm[9].y },
         force: 0.0
       };
     }
 
-    // 2. Bucle de Detección MediaPipe
+    // Dibujar silueta de la estrella en el canvas del celular
+    function dibujarGuiaEstrella(w, h) {
+      const cx = w / 2;
+      const cy = h / 2;
+      const baseR = Math.min(w, h) * 0.22;
+
+      canvasCtx.strokeStyle = "rgba(56, 189, 248, 0.45)";
+      canvasCtx.setLineDash([6, 6]);
+      canvasCtx.lineWidth = 2;
+      canvasCtx.beginPath();
+
+      for (let i = 0; i <= 120; i++) {
+        const theta = (i / 120) * Math.PI * 2;
+        const r = baseR * (1.15 + 0.45 * Math.cos(5 * theta));
+        const sx = cx + r * Math.cos(theta);
+        const sy = cy + r * Math.sin(theta);
+        if (i === 0) canvasCtx.moveTo(sx, sy);
+        else canvasCtx.lineTo(sx, sy);
+      }
+      canvasCtx.stroke();
+      canvasCtx.setLineDash([]);
+    }
+
+    // Procesamiento visual MediaPipe
     function onResults(results) {
       canvasCtx.save();
       canvasCtx.clearRect(0, 0, canvasElement.width, canvasElement.height);
 
-      const detectedCount = results.multiHandLandmarks ? results.multiHandLandmarks.length : 0;
+      // Dibujar la silueta objetivo de fondo
+      dibujarGuiaEstrella(canvasElement.width, canvasElement.height);
 
-      // Reset tarjetas visuales
+      const count = results.multiHandLandmarks ? results.multiHandLandmarks.length : 0;
+
       for (let h = 0; h < 2; h++) {
         const lbl = document.getElementById("labelH" + h);
         const gst = document.getElementById("gestureH" + h);
-        if (h >= detectedCount) {
-          lbl.innerText = "No detectada";
+        if (h >= count) {
+          lbl.innerText = "Buscando...";
           gst.className = "gesture-tag tag-idle";
           gst.innerText = "Inactiva";
         }
       }
 
-      if (detectedCount > 0) {
-        for (let h = 0; h < detectedCount; h++) {
+      if (count > 0) {
+        for (let h = 0; h < count; h++) {
           const lm = results.multiHandLandmarks[h];
           const gesto = clasificarGesto(lm);
 
-          // Actualizar feedback en UI móvil
           const lbl = document.getElementById("labelH" + h);
           const gst = document.getElementById("gestureH" + h);
-          lbl.innerText = "Detectada";
+          lbl.innerText = "Activa";
           gst.innerText = gesto.label;
           gst.className = "gesture-tag " + (gesto.action === "push" ? "tag-push" : gesto.action === "pull" ? "tag-pull" : "tag-idle");
 
-          // Dibujar esqueleto
+          // Esqueleto
           canvasCtx.strokeStyle = gesto.action === "push" ? "#ef4444" : gesto.action === "pull" ? "#38bdf8" : "#64748b";
           canvasCtx.lineWidth = 3;
           for (const [s, e] of HAND_CONNECTIONS) {
@@ -187,26 +273,23 @@
             canvasCtx.stroke();
           }
 
-          // Dibujar punto activo
+          // Punto de contacto
           canvasCtx.beginPath();
           canvasCtx.arc(gesto.point.x * canvasElement.width, gesto.point.y * canvasElement.height, 9, 0, 2 * Math.PI);
           canvasCtx.fillStyle = gesto.action === "push" ? "#ef4444" : gesto.action === "pull" ? "#38bdf8" : "#94a3b8";
           canvasCtx.fill();
 
-          // Enviar por MQTT a EMQX
+          // Enviar paquete a EMQX
           if (client.connected) {
             client.publish(TOPIC, JSON.stringify({
               id: `${USER_ID}_h${h}`,
-              rawUserId: USER_ID,
-              handIndex: h,
               action: gesto.action,
               label: gesto.label,
               hitPos: {
-                x: Number(((gesto.point.x - 0.5) * 3.2).toFixed(3)),
-                y: Number((-(gesto.point.y - 0.5) * 3.2).toFixed(3)),
-                z: 1.0
+                x: Number(((gesto.point.x - 0.5) * 3.4).toFixed(3)),
+                y: Number((-(gesto.point.y - 0.5) * 3.4).toFixed(3)),
+                z: 0.1
               },
-              radius: gesto.action === "push" ? 0.45 : 0.65, // El dedo pincha en un área más pequeña
               force: gesto.force
             }));
           }
@@ -216,7 +299,6 @@
       canvasCtx.restore();
     }
 
-    // Inicializar MediaPipe con soporte para 2 manos simultáneas
     const hands = new Hands({
       locateFile: (file) => `https://cdn.jsdelivr.net/npm/@mediapipe/hands/${file}`
     });
@@ -240,7 +322,9 @@
       height: 480
     });
 
-    cameraFeed.start();
+    cameraFeed.start().catch((err) => {
+      alert("Error al iniciar cámara: " + err);
+    });
   </script>
 </body>
 </html>
