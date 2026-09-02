@@ -125,38 +125,35 @@
     }
 
     // 5. Deformación en el plano 2D (Estirar hacia las puntas o hundir bordes)
-    function deformarPlano(hit, brushRadius, fuerza, action) {
-      if (!hit || fuerza <= 0 || action === "idle") return;
+function deformarPlano(hit, brushRadius, fuerza, action) {
+  if (!hit || fuerza <= 0 || action === "idle") return;
 
-      const pos = geometry.attributes.position;
-      const direccion = action === "pull" ? 1 : -1;
-      const step = (action === "push" ? 0.04 : 0.06) * fuerza * direccion;
+  const pos = geometry.attributes.position;
+  const direccion = action === "pull" ? 1 : -1;
+  const step = (action === "push" ? 0.025 : 0.035) * fuerza * direccion;
 
-      for (let i = 0; i < pos.count; i++) {
-        const vx = pos.getX(i);
-        const vy = pos.getY(i);
+  for (let i = 0; i < pos.count; i++) {
+    const vx = pos.getX(i);
+    const vy = pos.getY(i);
+    const dist = Math.hypot(vx - hit.x, vy - hit.y);
 
-        const dist = Math.hypot(vx - hit.x, vy - hit.y);
+    if (dist < brushRadius) {
+      const factor = Math.exp(-(dist * dist) / (2 * (brushRadius * 0.45) * (brushRadius * 0.45))) * step;
+      const radDist = Math.hypot(vx, vy) || 1;
+      const nuevoR = radDist + factor;
 
-        if (dist < brushRadius) {
-          const factor = Math.exp(-(dist * dist) / (2 * (brushRadius * 0.45) * (brushRadius * 0.45))) * step;
-          
-          // Dirección radial desde el centro de la masa (0,0)
-          const radDist = Math.hypot(vx, vy) || 1;
-          const nx = vx / radDist;
-          const ny = vy / radDist;
-
-          // Desplazamiento en el plano X, Y
-          pos.setX(i, vx + nx * factor);
-          pos.setY(i, vy + ny * factor);
-        }
+      // Mismos límites elásticos que en el celular
+      if (nuevoR >= 0.45 && nuevoR <= 2.1) {
+        pos.setX(i, (vx / radDist) * nuevoR);
+        pos.setY(i, (vy / radDist) * nuevoR);
       }
-
-      pos.needsUpdate = true;
-      geometry.computeVertexNormals();
-      calcularScore();
     }
+  }
 
+  pos.needsUpdate = true;
+  geometry.computeVertexNormals();
+  calcularScore();
+}
     // 6. Cálculo de similitud geométrica (% Match con la estrella)
     function calcularScore() {
       const pos = geometry.attributes.position;

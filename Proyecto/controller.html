@@ -5,80 +5,31 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
   <title>Controlador AR - DOM Estrella</title>
   <style>
-    body {
-      margin: 0;
-      background: #0b0f19;
-      color: white;
-      font-family: system-ui, -apple-system, sans-serif;
-      overflow: hidden;
-      touch-action: none;
-    }
-    
-    #viewport {
-      position: relative;
-      width: 100vw;
-      height: 74vh;
-      background: #000;
-    }
-    
-    /* Capas apiladas: Video (fondo) -> Canvas MediaPipe (medio) -> WebGL 3D (frente) */
-    #webcam {
-      position: absolute;
-      top: 0; left: 0; width: 100%; height: 100%;
-      object-fit: cover;
-      transform: scaleX(-1);
-      z-index: 1;
-    }
-
-    #skeletonCanvas {
-      position: absolute;
-      top: 0; left: 0; width: 100%; height: 100%;
-      object-fit: cover;
-      transform: scaleX(-1);
-      z-index: 2;
-      pointer-events: none;
-    }
-
-    #threeCanvas {
-      position: absolute;
-      top: 0; left: 0; width: 100%; height: 100%;
-      z-index: 3;
-      pointer-events: none;
-    }
+    body { margin: 0; background: #0b0f19; color: white; font-family: system-ui, sans-serif; overflow: hidden; touch-action: none; }
+    #viewport { position: relative; width: 100vw; height: 74vh; background: #000; }
+    #webcam { position: absolute; top: 0; left: 0; width: 100%; height: 100%; object-fit: cover; transform: scaleX(-1); z-index: 1; }
+    #skeletonCanvas { position: absolute; top: 0; left: 0; width: 100%; height: 100%; object-fit: cover; transform: scaleX(-1); z-index: 2; pointer-events: none; }
+    #threeCanvas { position: absolute; top: 0; left: 0; width: 100%; height: 100%; z-index: 3; pointer-events: none; }
 
     #panelInfo {
-      position: absolute;
-      bottom: 0; left: 0; right: 0;
-      height: 26vh;
-      background: rgba(15, 23, 42, 0.95);
-      backdrop-filter: blur(8px);
-      border-top: 1px solid #334155;
-      padding: 10px 14px;
-      box-sizing: border-box;
-      display: flex;
-      flex-direction: column;
-      justify-content: space-between;
-      z-index: 10;
+      position: absolute; bottom: 0; left: 0; right: 0; height: 26vh;
+      background: rgba(15, 23, 42, 0.95); backdrop-filter: blur(8px); border-top: 1px solid #334155;
+      padding: 10px 14px; box-sizing: border-box; display: flex; flex-direction: column; justify-content: space-between; z-index: 10;
     }
-
     .status-row { display: flex; justify-content: space-between; align-items: center; font-size: 12px; }
     .badge { padding: 3px 8px; border-radius: 6px; font-weight: bold; font-size: 11px; }
     .badge-ok { background: #065f46; color: #34d399; }
     .badge-wait { background: #854d0e; color: #fde047; }
-
     .hands-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
     .hand-card { background: #1e293b; padding: 6px 10px; border-radius: 8px; font-size: 11px; border: 1px solid #334155; }
     .hand-card strong { color: #38bdf8; }
-
     .gesture-tag { display: inline-block; margin-top: 3px; padding: 2px 6px; border-radius: 4px; font-weight: bold; font-size: 11px; }
     .tag-idle { background: #475569; color: #cbd5e1; }
     .tag-push { background: #b91c1c; color: #fecaca; }
     .tag-pull { background: #1d4ed8; color: #bfdbfe; }
-
     .help-hint { font-size: 11px; color: #94a3b8; text-align: center; }
   </style>
 
-  <!-- Three.js, MediaPipe Hands y MQTT -->
   <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/@mediapipe/camera_utils/camera_utils.js" crossorigin="anonymous"></script>
   <script src="https://cdn.jsdelivr.net/npm/@mediapipe/hands/hands.js" crossorigin="anonymous"></script>
@@ -95,7 +46,7 @@
   <div id="panelInfo">
     <div class="status-row">
       <span>📡 EMQX: <strong id="netStatus" class="badge badge-wait">Conectando...</strong></span>
-      <button onclick="resetDoughLocal()" style="background:#ef4444; border:none; color:white; padding:4px 8px; border-radius:4px; font-size:11px; font-weight:bold;">🔄 Reset</button>
+      <button onclick="resetDoughLocal()" style="background:#ef4444; border:none; color:white; padding:4px 8px; border-radius:4px; font-size:11px; font-weight:bold; cursor:pointer;">🔄 Reset</button>
     </div>
 
     <div class="hands-grid">
@@ -110,7 +61,7 @@
     </div>
 
     <div class="help-hint">
-      ☝️ <strong>1 dedo:</strong> Hunde | 🤏 <strong>Pinza:</strong> Jala punta de estrella
+      ☝️ <strong>1 dedo:</strong> Hunde borde | 🤏 <strong>Pinza:</strong> Jala punta firme
     </div>
   </div>
 
@@ -124,7 +75,7 @@
     const threeCanvas = document.getElementById("threeCanvas");
     const netStatus = document.getElementById("netStatus");
 
-    // 1. Escena Three.js en el Móvil (Transparente sobre la cámara)
+    // 1. Escena Three.js idéntica a la del PC
     const viewport = document.getElementById("viewport");
     const scene = new THREE.Scene();
     const camera = new THREE.PerspectiveCamera(40, viewport.clientWidth / viewport.clientHeight, 0.1, 1000);
@@ -152,7 +103,7 @@
     starLine.computeLineDistances();
     scene.add(starLine);
 
-    // Masa Play-Doh (Disco 2.5D)
+    // Masa Play-Doh (Disco 2.5D idéntico al PC)
     const R_INICIAL = 1.2;
     const geometry = new THREE.CylinderGeometry(R_INICIAL, R_INICIAL, 0.25, 90, 8, false);
     geometry.rotateX(Math.PI / 2);
@@ -163,18 +114,20 @@
       roughness: 0.8,
       metalness: 0.05,
       transparent: true,
-      opacity: 0.88 // Ligeramente traslúcida para que veas tus dedos detrás
+      opacity: 0.90
     });
 
     const doughMesh = new THREE.Mesh(geometry, material);
     scene.add(doughMesh);
 
-    // Deformación de Masa
-    function deformarMasaLocal(hit, brushRadius, fuerza, action) {
+    // DEFORMACIÓN CON FÍSICA DE MASA CONTROLADA
+    function deformarMasaFirme(hit, brushRadius, fuerza, action) {
       if (!hit || fuerza <= 0 || action === "idle") return;
+
       const pos = geometry.attributes.position;
       const direccion = action === "pull" ? 1 : -1;
-      const step = (action === "push" ? 0.04 : 0.06) * fuerza * direccion;
+      // Desplazamiento pequeño y controlado por paso
+      const step = (action === "push" ? 0.025 : 0.035) * fuerza * direccion;
 
       for (let i = 0; i < pos.count; i++) {
         const vx = pos.getX(i);
@@ -184,8 +137,13 @@
         if (dist < brushRadius) {
           const factor = Math.exp(-(dist * dist) / (2 * (brushRadius * 0.45) * (brushRadius * 0.45))) * step;
           const radDist = Math.hypot(vx, vy) || 1;
-          pos.setX(i, vx + (vx / radDist) * factor);
-          pos.setY(i, vy + (vy / radDist) * factor);
+          const nuevoR = radDist + factor;
+
+          // LÍMITES FÍSICOS (Evita que la masa explote o colapse a 0)
+          if (nuevoR >= 0.45 && nuevoR <= 2.1) {
+            pos.setX(i, (vx / radDist) * nuevoR);
+            pos.setY(i, (vy / radDist) * nuevoR);
+          }
         }
       }
       pos.needsUpdate = true;
@@ -209,16 +167,16 @@
 
     client.on("connect", () => {
       netStatus.className = "badge badge-ok";
-      netStatus.innerText = "🟢 En vivo (" + USER_ID + ")";
+      netStatus.innerText = "🟢 Conectado (" + USER_ID + ")";
       client.subscribe(TOPIC);
     });
 
-    // Si otro colaborador deforma, también actualizamos nuestra masa local
     client.on("message", (topic, message) => {
       try {
         const data = JSON.parse(message.toString());
+        // Solo aplicar si viene de otro usuario para evitar auto-duplicación
         if (data.rawUserId !== USER_ID && data.hitPos) {
-          deformarMasaLocal(data.hitPos, data.action === "push" ? 0.45 : 0.65, data.force, data.action);
+          deformarMasaFirme(data.hitPos, data.action === "push" ? 0.40 : 0.60, data.force, data.action);
         }
       } catch (e) {}
     });
@@ -245,39 +203,39 @@
       const pinkyExt = isExtended(20, 18);
 
       const distThumbIndex = Math.hypot(lm[4].x - lm[8].x, lm[4].y - lm[8].y) / palmSize;
-      const distThumbMiddle = Math.hypot(lm[4].x - lm[12].x, lm[4].y - lm[12].y) / palmSize;
 
-      if (distThumbIndex < 0.35 || (distThumbIndex < 0.40 && distThumbMiddle < 0.45)) {
+      // Pinza limpia (pulgar e índice)
+      if (distThumbIndex < 0.32) {
         return {
           action: "pull",
-          label: "🤏 Pinza (Estirar)",
+          label: "🤏 Pinza (Jalar)",
           point: { x: (lm[4].x + lm[8].x) / 2, y: (lm[4].y + lm[8].y) / 2 },
           force: 1.0
         };
       }
 
+      // Hundir (solo índice extendido)
       if (indexExt && !middleExt && !ringExt && !pinkyExt) {
         return {
           action: "push",
           label: "☝️ Puntazo (Hundir)",
           point: { x: lm[8].x, y: lm[8].y },
-          force: 0.9
+          force: 0.8
         };
       }
 
-      return {
-        action: "idle",
-        label: "✋ Reposo",
-        point: { x: lm[9].x, y: lm[9].y },
-        force: 0.0
-      };
+      return { action: "idle", label: "✋ Reposo", point: { x: lm[9].x, y: lm[9].y }, force: 0.0 };
     }
+
+    // Cooldown para amortiguar y dar consistencia de masa plástica
+    let lastDeformTime = [0, 0];
 
     function onResults(results) {
       skCtx.save();
       skCtx.clearRect(0, 0, skCanvas.width, skCanvas.height);
 
       const count = results.multiHandLandmarks ? results.multiHandLandmarks.length : 0;
+      const now = Date.now();
 
       for (let h = 0; h < 2; h++) {
         const lbl = document.getElementById("labelH" + h);
@@ -300,7 +258,7 @@
           gst.innerText = gesto.label;
           gst.className = "gesture-tag " + (gesto.action === "push" ? "tag-push" : gesto.action === "pull" ? "tag-pull" : "tag-idle");
 
-          // Dibujar esqueleto
+          // Esqueleto
           skCtx.strokeStyle = gesto.action === "push" ? "#ef4444" : gesto.action === "pull" ? "#38bdf8" : "#64748b";
           skCtx.lineWidth = 3;
           for (const [s, e] of HAND_CONNECTIONS) {
@@ -310,35 +268,33 @@
             skCtx.stroke();
           }
 
-          // Punto activo en el esqueleto
           skCtx.beginPath();
           skCtx.arc(gesto.point.x * skCanvas.width, gesto.point.y * skCanvas.height, 8, 0, 2 * Math.PI);
           skCtx.fillStyle = gesto.action === "push" ? "#ef4444" : gesto.action === "pull" ? "#38bdf8" : "#94a3b8";
           skCtx.fill();
 
-          // Mapeo de coordenadas al espacio 3D (ajustado a la vista frontal del celular)
-          // Nota: El video está con escala invertida (espejo), por lo que invertimos X en 3D
+          // Mapeo 3D
           const hitPos3D = {
-            x: Number((-(gesto.point.x - 0.5) * 3.6).toFixed(3)),
-            y: Number((-(gesto.point.y - 0.5) * 4.2).toFixed(3)),
+            x: Number((-(gesto.point.x - 0.5) * 3.4).toFixed(3)),
+            y: Number((-(gesto.point.y - 0.5) * 4.0).toFixed(3)),
             z: 0.1
           };
 
-          // 1. Deformación INMEDIATA local en la pantalla del celular
-          if (gesto.action !== "idle") {
-            deformarMasaLocal(hitPos3D, gesto.action === "push" ? 0.45 : 0.65, gesto.force, gesto.action);
-          }
+          // Aplicar solo si pasó el intervalo de enfriamiento (100 ms) para mantener firmeza
+          if (gesto.action !== "idle" && (now - lastDeformTime[h] > 100)) {
+            lastDeformTime[h] = now;
+            deformarMasaFirme(hitPos3D, gesto.action === "push" ? 0.40 : 0.60, gesto.force, gesto.action);
 
-          // 2. Transmisión a EMQX para que el PC y los demás vean exactamente lo mismo
-          if (client.connected) {
-            client.publish(TOPIC, JSON.stringify({
-              id: `${USER_ID}_h${h}`,
-              rawUserId: USER_ID,
-              action: gesto.action,
-              label: gesto.label,
-              hitPos: hitPos3D,
-              force: gesto.force
-            }));
+            if (client.connected) {
+              client.publish(TOPIC, JSON.stringify({
+                id: `${USER_ID}_h${h}`,
+                rawUserId: USER_ID,
+                action: gesto.action,
+                label: gesto.label,
+                hitPos: hitPos3D,
+                force: gesto.force
+              }));
+            }
           }
         }
       }
@@ -371,7 +327,6 @@
 
     cameraFeed.start();
 
-    // Loop de Renderizado 3D
     function animate() {
       requestAnimationFrame(animate);
       renderer.render(scene, camera);
