@@ -3,31 +3,45 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
-  <title>Controlador AR - DOM Estrella</title>
+  <title>Controlador AR - Carrera Play-Doh</title>
   <style>
-    body { margin: 0; background: #0b0f19; color: white; font-family: system-ui, sans-serif; overflow: hidden; touch-action: none; }
-    #viewport { position: relative; width: 100vw; height: 74vh; background: #000; }
+    body { margin: 0; background: #080c14; color: white; font-family: system-ui, sans-serif; overflow: hidden; touch-action: none; }
+    #viewport { position: relative; width: 100vw; height: 75vh; background: #000; }
     #webcam { position: absolute; top: 0; left: 0; width: 100%; height: 100%; object-fit: cover; transform: scaleX(-1); z-index: 1; }
-    #skeletonCanvas { position: absolute; top: 0; left: 0; width: 100%; height: 100%; object-fit: cover; transform: scaleX(-1); z-index: 2; pointer-events: none; }
+    #uiCanvas { position: absolute; top: 0; left: 0; width: 100%; height: 100%; z-index: 2; pointer-events: none; }
     #threeCanvas { position: absolute; top: 0; left: 0; width: 100%; height: 100%; z-index: 3; pointer-events: none; }
 
-    #panelInfo {
-      position: absolute; bottom: 0; left: 0; right: 0; height: 26vh;
-      background: rgba(15, 23, 42, 0.95); backdrop-filter: blur(8px); border-top: 1px solid #334155;
-      padding: 10px 14px; box-sizing: border-box; display: flex; flex-direction: column; justify-content: space-between; z-index: 10;
+    /* Banner flotante de nivel y meta */
+    #levelBadge {
+      position: absolute; top: 12px; left: 12px; right: 12px; z-index: 20;
+      background: rgba(15, 23, 42, 0.92); backdrop-filter: blur(8px);
+      border: 1px solid #334155; border-radius: 12px; padding: 10px 14px;
+      display: flex; justify-content: space-between; align-items: center;
     }
-    .status-row { display: flex; justify-content: space-between; align-items: center; font-size: 12px; }
-    .badge { padding: 3px 8px; border-radius: 6px; font-weight: bold; font-size: 11px; }
-    .badge-ok { background: #065f46; color: #34d399; }
-    .badge-wait { background: #854d0e; color: #fde047; }
+    .level-title { font-size: 14px; font-weight: 800; color: #38bdf8; }
+    .match-tag { font-size: 16px; font-weight: 900; color: #22c55e; }
+
+    #panelInfo {
+      position: absolute; bottom: 0; left: 0; right: 0; height: 25vh;
+      background: rgba(15, 23, 42, 0.96); border-top: 1px solid #334155;
+      padding: 10px 14px; box-sizing: border-box; display: flex; flex-direction: column;
+      justify-content: space-between; z-index: 20;
+    }
+    .status-row { display: flex; justify-content: space-between; align-items: center; font-size: 11px; }
     .hands-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
-    .hand-card { background: #1e293b; padding: 6px 10px; border-radius: 8px; font-size: 11px; border: 1px solid #334155; }
-    .hand-card strong { color: #38bdf8; }
-    .gesture-tag { display: inline-block; margin-top: 3px; padding: 2px 6px; border-radius: 4px; font-weight: bold; font-size: 11px; }
+    .hand-card { background: #1e293b; padding: 6px 8px; border-radius: 8px; font-size: 11px; border: 1px solid #334155; }
+    .gesture-tag { display: inline-block; padding: 2px 6px; border-radius: 4px; font-weight: bold; font-size: 10px; margin-top: 2px; }
     .tag-idle { background: #475569; color: #cbd5e1; }
     .tag-push { background: #b91c1c; color: #fecaca; }
     .tag-pull { background: #1d4ed8; color: #bfdbfe; }
-    .help-hint { font-size: 11px; color: #94a3b8; text-align: center; }
+
+    /* Cartel flotante de aviso */
+    #alertBox {
+      position: absolute; top: 40%; left: 10%; right: 10%; z-index: 30;
+      background: #22c55e; color: #022c22; padding: 14px; border-radius: 12px;
+      text-align: center; font-size: 20px; font-weight: 900; display: none;
+      box-shadow: 0 10px 25px rgba(0,0,0,0.7);
+    }
   </style>
 
   <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
@@ -39,44 +53,58 @@
 
   <div id="viewport">
     <video id="webcam" playsinline muted></video>
-    <canvas id="skeletonCanvas"></canvas>
+    <canvas id="uiCanvas"></canvas>
     <canvas id="threeCanvas"></canvas>
+    
+    <div id="levelBadge">
+      <div>
+        <div style="font-size: 10px; color: #94a3b8; text-transform: uppercase;">Objetivo Actual</div>
+        <div class="level-title" id="lblLevelName">Nivel 1: ❤️ Corazón</div>
+      </div>
+      <div class="match-tag" id="lblMatch">0%</div>
+    </div>
+
+    <div id="alertBox">¡NIVEL SUPERADO! 🎉</div>
   </div>
 
   <div id="panelInfo">
     <div class="status-row">
-      <span>📡 EMQX: <strong id="netStatus" class="badge badge-wait">Conectando...</strong></span>
-      <button onclick="resetDoughLocal()" style="background:#ef4444; border:none; color:white; padding:4px 8px; border-radius:4px; font-size:11px; font-weight:bold; cursor:pointer;">🔄 Reset</button>
+      <span>📡 EMQX: <strong id="netStatus" style="color:#fde047;">Conectando...</strong></span>
+      <span style="color:#94a3b8;">Meta: &gt;70%</span>
     </div>
 
     <div class="hands-grid">
       <div class="hand-card" id="cardH0">
-        <div><strong>Mano 1:</strong> <span id="labelH0">Buscando...</span></div>
-        <div id="gestureH0" class="gesture-tag tag-idle">Inactiva</div>
+        <div>Mano 1: <strong id="lblH0" style="color:#38bdf8;">Buscando</strong></div>
+        <div id="gstH0" class="gesture-tag tag-idle">Inactiva</div>
       </div>
       <div class="hand-card" id="cardH1">
-        <div><strong>Mano 2:</strong> <span id="labelH1">Buscando...</span></div>
-        <div id="gestureH1" class="gesture-tag tag-idle">Inactiva</div>
+        <div>Mano 2: <strong id="lblH1" style="color:#38bdf8;">Buscando</strong></div>
+        <div id="gstH1" class="gesture-tag tag-idle">Inactiva</div>
       </div>
     </div>
 
-    <div class="help-hint">
-      ☝️ <strong>1 dedo:</strong> Hunde | 🤏 <strong>Pinza:</strong> Jala punta firme
+    <div style="font-size:10px; color:#94a3b8; text-align:center;">
+      ☝️ 1 dedo: Hunde bordes | 🤏 Pinza: Estira hacia la silueta
     </div>
   </div>
 
   <script>
     const USER_ID = "usr_" + Math.random().toString(16).substring(2, 6);
-    const TOPIC = "mcd/dom/shared_mesh";
+    const TOPIC_TELEMETRY = "mcd/dom/telemetry";
+    const TOPIC_CONTROL = "mcd/dom/game_control";
+
+    let currentLevel = 1;
+    let gameActive = true;
+    let currentMatch = 0;
 
     const videoElement = document.getElementById("webcam");
-    const skCanvas = document.getElementById("skeletonCanvas");
-    const skCtx = skCanvas.getContext("2d");
+    const uiCanvas = document.getElementById("uiCanvas");
+    const uiCtx = uiCanvas.getContext("2d");
     const threeCanvas = document.getElementById("threeCanvas");
-    const netStatus = document.getElementById("netStatus");
-
-    // 1. Escena Three.js con cámara más alejada (Margen holgado)
     const viewport = document.getElementById("viewport");
+
+    // 1. Escena Three.js para la masa
     const scene = new THREE.Scene();
     const camera = new THREE.PerspectiveCamera(40, viewport.clientWidth / viewport.clientHeight, 0.1, 1000);
     camera.position.set(0, 0, 8.5);
@@ -85,27 +113,14 @@
     renderer.setSize(viewport.clientWidth, viewport.clientHeight);
     renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
 
-    scene.add(new THREE.AmbientLight(0xffffff, 0.8));
-    const dirLight = new THREE.DirectionalLight(0xfff7ed, 1.3);
+    scene.add(new THREE.AmbientLight(0xffffff, 0.85));
+    const dirLight = new THREE.DirectionalLight(0xffedd5, 1.3);
     dirLight.position.set(3, 5, 4);
     scene.add(dirLight);
 
-    // Silueta Estrella Reducida (Centro de pantalla con margen)
-    const points = [];
-    for (let i = 0; i <= 150; i++) {
-      const theta = (i / 150) * Math.PI * 2;
-      const r = 0.95 + 0.45 * Math.cos(5 * theta); // Radio min: 0.50, máx: 1.40
-      points.push(new THREE.Vector3(r * Math.cos(theta), r * Math.sin(theta), -0.05));
-    }
-    const starGeo = new THREE.BufferGeometry().setFromPoints(points);
-    const starMat = new THREE.LineDashedMaterial({ color: 0x38bdf8, dashSize: 0.08, gapSize: 0.04, linewidth: 2 });
-    const starLine = new THREE.Line(starGeo, starMat);
-    starLine.computeLineDistances();
-    scene.add(starLine);
-
-    // Masa Play-Doh Reducida
-    const R_INICIAL = 0.80;
-    const geometry = new THREE.CylinderGeometry(R_INICIAL, R_INICIAL, 0.20, 90, 8, false);
+    // Masa Circular Inicial
+    const R_BASE = 0.80;
+    const geometry = new THREE.CylinderGeometry(R_BASE, R_BASE, 0.20, 90, 8, false);
     geometry.rotateX(Math.PI / 2);
     const originalPositions = geometry.attributes.position.clone();
 
@@ -120,13 +135,68 @@
     const doughMesh = new THREE.Mesh(geometry, material);
     scene.add(doughMesh);
 
-    // Deformación con límites seguros y margen
+    // Ecuaciones de los 3 niveles
+    function getRadiusTarget(theta, lvl) {
+      if (lvl === 1) { // Corazón redondeado
+        const t = theta + Math.PI / 2;
+        const x = 16 * Math.pow(Math.sin(t), 3);
+        const y = 13 * Math.cos(t) - 5 * Math.cos(2*t) - 2 * Math.cos(3*t) - Math.cos(4*t);
+        return (Math.hypot(x, y) / 16) * 1.05;
+      } else if (lvl === 2) { // Nube
+        return 0.95 + 0.30 * Math.sin(3 * theta) + 0.15 * Math.cos(6 * theta);
+      } else { // Estrella 5 puntas
+        return 0.95 + 0.45 * Math.cos(5 * theta);
+      }
+    }
+
+    // Dibujo de Silueta de Alto Contraste (Brillo neón + silueta rellena sutil)
+    function dibujarSiluetaAltoContraste(w, h) {
+      const cx = w / 2;
+      const cy = h / 2;
+      // Escala ajustada a la cámara Z = 8.5
+      const pxScale = Math.min(w, h) * 0.24;
+
+      uiCtx.save();
+
+      // 1. Trazado del contorno
+      uiCtx.beginPath();
+      for (let i = 0; i <= 160; i++) {
+        const theta = (i / 160) * Math.PI * 2;
+        const r = getRadiusTarget(theta, currentLevel) * pxScale;
+        const x = cx + r * Math.cos(theta);
+        const y = cy - r * Math.sin(theta);
+        if (i === 0) uiCtx.moveTo(x, y);
+        else uiCtx.lineTo(x, y);
+      }
+      uiCtx.closePath();
+
+      // Relleno semitransparente oscuro detrás de la silueta para tapar distracciones de la cámara
+      uiCtx.fillStyle = "rgba(15, 23, 42, 0.35)";
+      uiCtx.fill();
+
+      // Línea exterior brillante neón (Cian)
+      uiCtx.strokeStyle = "#38bdf8";
+      uiCtx.lineWidth = 5;
+      uiCtx.shadowColor = "#0284c7";
+      uiCtx.shadowBlur = 12;
+      uiCtx.stroke();
+
+      // Línea interior blanca para máximo contraste
+      uiCtx.strokeStyle = "#ffffff";
+      uiCtx.lineWidth = 1.5;
+      uiCtx.shadowBlur = 0;
+      uiCtx.stroke();
+
+      uiCtx.restore();
+    }
+
+    // Deformación física controlada
     function deformarMasaFirme(hit, brushRadius, fuerza, action) {
-      if (!hit || fuerza <= 0 || action === "idle") return;
+      if (!hit || fuerza <= 0 || action === "idle" || !gameActive) return;
 
       const pos = geometry.attributes.position;
       const direccion = action === "pull" ? 1 : -1;
-      const step = (action === "push" ? 0.022 : 0.032) * fuerza * direccion;
+      const step = (action === "push" ? 0.024 : 0.034) * fuerza * direccion;
 
       for (let i = 0; i < pos.count; i++) {
         const vx = pos.getX(i);
@@ -138,8 +208,7 @@
           const radDist = Math.hypot(vx, vy) || 1;
           const nuevoR = radDist + factor;
 
-          // Límite máximo 1.65 (Garantiza al menos 30% de espacio libre en los bordes)
-          if (nuevoR >= 0.35 && nuevoR <= 1.65) {
+          if (nuevoR >= 0.35 && nuevoR <= 1.70) {
             pos.setX(i, (vx / radDist) * nuevoR);
             pos.setY(i, (vy / radDist) * nuevoR);
           }
@@ -147,37 +216,106 @@
       }
       pos.needsUpdate = true;
       geometry.computeVertexNormals();
+      evaluarProgreso();
     }
 
-    function resetDoughLocal() {
+    // Evaluación geométrica del % de coincidencia
+    function evaluarProgreso() {
+      const pos = geometry.attributes.position;
+      let totalDiff = 0;
+      let count = 0;
+
+      for (let i = 0; i < pos.count; i++) {
+        const x = pos.getX(i);
+        const y = pos.getY(i);
+        const rActual = Math.hypot(x, y);
+
+        if (rActual > 0.50) {
+          const theta = Math.atan2(y, x);
+          const rTarget = getRadiusTarget(theta, currentLevel);
+          totalDiff += Math.abs(rActual - rTarget);
+          count++;
+        }
+      }
+
+      const err = count > 0 ? totalDiff / count : 1;
+      currentMatch = Math.max(0, Math.min(100, Math.round((1 - err / 0.52) * 100)));
+
+      document.getElementById("lblMatch").innerText = currentMatch + "%";
+
+      // Superó el 70%: Siguiente nivel
+      if (currentMatch >= 70) {
+        avanzarNivel();
+      }
+    }
+
+    function resetMasa() {
       const pos = geometry.attributes.position;
       for (let i = 0; i < pos.count; i++) {
         pos.setXYZ(i, originalPositions.getX(i), originalPositions.getY(i), originalPositions.getZ(i));
       }
       pos.needsUpdate = true;
       geometry.computeVertexNormals();
+      evaluarProgreso();
     }
 
-    // 2. MQTT
+    function avanzarNivel() {
+      gameActive = false;
+      const alertBox = document.getElementById("alertBox");
+      alertBox.style.display = "block";
+
+      setTimeout(() => {
+        alertBox.style.display = "none";
+        currentLevel++;
+        if (currentLevel > 3) {
+          document.getElementById("lblLevelName").innerText = "🏆 ¡JUEGO COMPLETADO!";
+        } else {
+          const nombres = ["", "❤️ Corazón", "☁️ Nube", "⭐ Estrella"];
+          document.getElementById("lblLevelName").innerText = `Nivel ${currentLevel}: ${nombres[currentLevel]}`;
+          resetMasa();
+          gameActive = true;
+        }
+      }, 1500);
+    }
+
+    // 2. MQTT EMQX
     const client = mqtt.connect("wss://broker.emqx.io:8084/mqtt", {
       clientId: USER_ID,
       clean: true
     });
 
     client.on("connect", () => {
-      netStatus.className = "badge badge-ok";
-      netStatus.innerText = "🟢 Conectado (" + USER_ID + ")";
-      client.subscribe(TOPIC);
+      document.getElementById("netStatus").innerText = "🟢 Conectado";
+      document.getElementById("netStatus").style.color = "#34d399";
+      client.subscribe(TOPIC_CONTROL);
     });
 
     client.on("message", (topic, message) => {
       try {
-        const data = JSON.parse(message.toString());
-        if (data.rawUserId !== USER_ID && data.hitPos) {
-          deformarMasaFirme(data.hitPos, data.action === "push" ? 0.32 : 0.48, data.force, data.action);
+        const cmd = JSON.parse(message.toString());
+        if (cmd.action === "START_GAME") {
+          currentLevel = 1;
+          resetMasa();
+          gameActive = true;
+          document.getElementById("lblLevelName").innerText = "Nivel 1: ❤️ Corazón";
+        } else if (cmd.action === "RESET_ALL") {
+          currentLevel = 1;
+          resetMasa();
+          document.getElementById("lblLevelName").innerText = "Nivel 1: ❤️ Corazón";
         }
       } catch (e) {}
     });
+
+    // Enviar telemetría al PC 4 veces por segundo
+    setInterval(() => {
+      if (client.connected) {
+        client.publish(TOPIC_TELEMETRY, JSON.stringify({
+          id: USER_ID,
+          level: currentLevel,
+          match: currentMatch
+        }));
+      }
+    }, 250);
 
     // 3. MediaPipe
     const HAND_CONNECTIONS = [
@@ -189,54 +327,38 @@
     function clasificarGesto(lm) {
       const wrist = lm[0];
       const palmSize = Math.hypot(wrist.x - lm[9].x, wrist.y - lm[9].y) || 0.1;
+      const isExt = (tip, pip) => Math.hypot(lm[tip].x - wrist.x, lm[tip].y - wrist.y) > Math.hypot(lm[pip].x - wrist.x, lm[pip].y - wrist.y);
 
-      const isExtended = (tip, pip) => {
-        return Math.hypot(lm[tip].x - wrist.x, lm[tip].y - wrist.y) >
-               Math.hypot(lm[pip].x - wrist.x, lm[pip].y - wrist.y);
-      };
-
-      const indexExt = isExtended(8, 6);
-      const middleExt = isExtended(12, 10);
-      const ringExt = isExtended(16, 14);
-      const pinkyExt = isExtended(20, 18);
-
+      const indexExt = isExt(8, 6);
+      const otherFolded = !isExt(12, 10) && !isExt(16, 14) && !isExt(20, 18);
       const distThumbIndex = Math.hypot(lm[4].x - lm[8].x, lm[4].y - lm[8].y) / palmSize;
 
       if (distThumbIndex < 0.32) {
-        return {
-          action: "pull",
-          label: "🤏 Pinza (Jalar)",
-          point: { x: (lm[4].x + lm[8].x) / 2, y: (lm[4].y + lm[8].y) / 2 },
-          force: 1.0
-        };
+        return { action: "pull", label: "🤏 Pinza", point: { x: (lm[4].x + lm[8].x)/2, y: (lm[4].y + lm[8].y)/2 }, force: 1.0 };
       }
-
-      if (indexExt && !middleExt && !ringExt && !pinkyExt) {
-        return {
-          action: "push",
-          label: "☝️ Puntazo (Hundir)",
-          point: { x: lm[8].x, y: lm[8].y },
-          force: 0.8
-        };
+      if (indexExt && otherFolded) {
+        return { action: "push", label: "☝️ Hundir", point: { x: lm[8].x, y: lm[8].y }, force: 0.85 };
       }
-
       return { action: "idle", label: "✋ Reposo", point: { x: lm[9].x, y: lm[9].y }, force: 0.0 };
     }
 
     let lastDeformTime = [0, 0];
 
     function onResults(results) {
-      skCtx.save();
-      skCtx.clearRect(0, 0, skCanvas.width, skCanvas.height);
+      uiCtx.save();
+      uiCtx.clearRect(0, 0, uiCanvas.width, uiCanvas.height);
+
+      // Dibujar la silueta neón de fondo
+      dibujarSiluetaAltoContraste(uiCanvas.width, uiCanvas.height);
 
       const count = results.multiHandLandmarks ? results.multiHandLandmarks.length : 0;
       const now = Date.now();
 
       for (let h = 0; h < 2; h++) {
-        const lbl = document.getElementById("labelH" + h);
-        const gst = document.getElementById("gestureH" + h);
+        const lbl = document.getElementById("lblH" + h);
+        const gst = document.getElementById("gstH" + h);
         if (h >= count) {
-          lbl.innerText = "Buscando...";
+          lbl.innerText = "Buscando";
           gst.className = "gesture-tag tag-idle";
           gst.innerText = "Inactiva";
         }
@@ -247,28 +369,29 @@
           const lm = results.multiHandLandmarks[h];
           const gesto = clasificarGesto(lm);
 
-          const lbl = document.getElementById("labelH" + h);
-          const gst = document.getElementById("gestureH" + h);
+          const lbl = document.getElementById("lblH" + h);
+          const gst = document.getElementById("gstH" + h);
           lbl.innerText = "Activa";
           gst.innerText = gesto.label;
           gst.className = "gesture-tag " + (gesto.action === "push" ? "tag-push" : gesto.action === "pull" ? "tag-pull" : "tag-idle");
 
           // Esqueleto
-          skCtx.strokeStyle = gesto.action === "push" ? "#ef4444" : gesto.action === "pull" ? "#38bdf8" : "#64748b";
-          skCtx.lineWidth = 3;
+          uiCtx.strokeStyle = gesto.action === "push" ? "#ef4444" : gesto.action === "pull" ? "#38bdf8" : "rgba(148, 163, 184, 0.7)";
+          uiCtx.lineWidth = 3;
           for (const [s, e] of HAND_CONNECTIONS) {
-            skCtx.beginPath();
-            skCtx.moveTo(lm[s].x * skCanvas.width, lm[s].y * skCanvas.height);
-            skCtx.lineTo(lm[e].x * skCanvas.width, lm[e].y * skCanvas.height);
-            skCtx.stroke();
+            uiCtx.beginPath();
+            uiCtx.moveTo((1 - lm[s].x) * uiCanvas.width, lm[s].y * uiCanvas.height);
+            uiCtx.lineTo((1 - lm[e].x) * uiCanvas.width, lm[e].y * uiCanvas.height);
+            uiCtx.stroke();
           }
 
-          skCtx.beginPath();
-          skCtx.arc(gesto.point.x * skCanvas.width, gesto.point.y * skCanvas.height, 8, 0, 2 * Math.PI);
-          skCtx.fillStyle = gesto.action === "push" ? "#ef4444" : gesto.action === "pull" ? "#38bdf8" : "#94a3b8";
-          skCtx.fill();
+          // Punto de contacto
+          uiCtx.beginPath();
+          uiCtx.arc((1 - gesto.point.x) * uiCanvas.width, gesto.point.y * uiCanvas.height, 8, 0, 2 * Math.PI);
+          uiCtx.fillStyle = gesto.action === "push" ? "#ef4444" : gesto.action === "pull" ? "#38bdf8" : "#94a3b8";
+          uiCtx.fill();
 
-          // Mapeo 3D proporcional al nuevo campo de visión (Z = 8.5)
+          // Mapeo 3D
           const hitPos3D = {
             x: Number((-(gesto.point.x - 0.5) * 4.6).toFixed(3)),
             y: Number((-(gesto.point.y - 0.5) * 5.4).toFixed(3)),
@@ -278,22 +401,11 @@
           if (gesto.action !== "idle" && (now - lastDeformTime[h] > 100)) {
             lastDeformTime[h] = now;
             deformarMasaFirme(hitPos3D, gesto.action === "push" ? 0.32 : 0.48, gesto.force, gesto.action);
-
-            if (client.connected) {
-              client.publish(TOPIC, JSON.stringify({
-                id: `${USER_ID}_h${h}`,
-                rawUserId: USER_ID,
-                action: gesto.action,
-                label: gesto.label,
-                hitPos: hitPos3D,
-                force: gesto.force
-              }));
-            }
           }
         }
       }
 
-      skCtx.restore();
+      uiCtx.restore();
     }
 
     const hands = new Hands({
@@ -311,8 +423,8 @@
 
     const cameraFeed = new Camera(videoElement, {
       onFrame: async () => {
-        skCanvas.width = videoElement.videoWidth;
-        skCanvas.height = videoElement.videoHeight;
+        uiCanvas.width = videoElement.videoWidth;
+        uiCanvas.height = videoElement.videoHeight;
         await hands.send({ image: videoElement });
       },
       width: 640,
