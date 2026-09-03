@@ -2,156 +2,324 @@
 <html lang="es">
 <head>
   <meta charset="UTF-8">
-  <title>DOM Play-Doh: Gran Carrera de Escultura</title>
+  <title>Carrera de Destreza - Pantalla Central</title>
   <style>
-    body { margin: 0; overflow: hidden; background: #080c14; color: white; font-family: system-ui, -apple-system, sans-serif; }
+    body { margin: 0; overflow: hidden; background: #fdfbf7; color: #0f172a; font-family: 'Segoe UI', system-ui, sans-serif; display: flex; width: 100vw; height: 100vh; }
     
-    #panel {
-      position: absolute; top: 15px; left: 15px; z-index: 10;
-      background: rgba(15, 23, 42, 0.94); backdrop-filter: blur(10px);
-      padding: 18px 22px; border-radius: 14px; border: 1px solid #334155; width: 360px;
-      box-shadow: 0 8px 30px rgba(0,0,0,0.6);
-    }
-    h2 { margin: 0 0 6px 0; font-size: 18px; color: #f97316; display: flex; align-items: center; gap: 8px; }
-    .stat { font-size: 13px; color: #94a3b8; margin-top: 4px; }
-    .stat strong { color: #38bdf8; }
-
-    .btn-start {
-      background: #22c55e; color: #022c22; border: none; padding: 10px 14px;
-      border-radius: 8px; font-weight: 800; font-size: 14px; cursor: pointer;
-      margin-top: 12px; width: 100%; transition: all 0.2s;
-    }
-    .btn-start:hover { background: #16a34a; color: white; }
-    .btn-reset {
-      background: #ef4444; color: white; border: none; padding: 8px 12px;
-      border-radius: 6px; font-weight: bold; cursor: pointer; margin-top: 8px; width: 100%;
+    /* Contenedor Principal (Pista de Atletismo) */
+    #mainView {
+      flex: 1; height: 100vh; display: flex; flex-direction: column;
+      transition: all 0.3s ease; position: relative;
     }
 
-    /* Leaderboard de Carrera */
-    #leaderboard { margin-top: 14px; display: flex; flex-direction: column; gap: 8px; max-height: 280px; overflow-y: auto; }
-    .racer-card {
-      background: #1e293b; border: 1px solid #334155; border-radius: 8px; padding: 8px 12px;
+    header {
+      padding: 16px 24px; display: flex; justify-content: space-between; align-items: center;
+      border-bottom: 2px solid #e2e8f0; background: #ffffff;
     }
-    .racer-header { display: flex; justify-content: space-between; font-size: 12px; margin-bottom: 4px; }
-    .racer-name { font-weight: bold; color: #f1f5f9; }
-    .racer-lvl { color: #f59e0b; font-weight: bold; }
-    
-    .track-bg { width: 100%; height: 12px; background: #0f172a; border-radius: 6px; overflow: hidden; position: relative; }
-    .track-fill { height: 100%; width: 0%; background: linear-gradient(90deg, #38bdf8, #22c55e); transition: width 0.25s ease-out; }
-    .track-mark { position: absolute; left: 70%; top: 0; bottom: 0; width: 2px; background: #facc15; }
+    h1 { margin: 0; font-size: 26px; font-weight: 900; color: #6366f1; letter-spacing: -0.5px; }
 
+    .header-btns { display: flex; gap: 10px; }
+    button {
+      border: none; border-radius: 8px; padding: 10px 16px; font-weight: bold;
+      cursor: pointer; font-size: 13px; transition: all 0.2s;
+    }
+    .btn-start { background: #22c55e; color: white; }
+    .btn-start:hover { background: #16a34a; }
+    .btn-analytics { background: #6366f1; color: white; }
+    .btn-export { background: #0ea5e9; color: white; }
+
+    /* Canvas de Pista de Atletismo */
+    #trackContainer { flex: 1; position: relative; background: #84cc16; overflow: hidden; }
+    canvas#trackCanvas { width: 100%; height: 100%; display: block; }
+
+    /* Panel Lateral de Analítica (Drawer) */
+    #analyticsDrawer {
+      width: 0; height: 100vh; background: #0f172a; color: #f8fafc;
+      overflow-y: auto; transition: width 0.3s ease; box-shadow: -4px 0 20px rgba(0,0,0,0.25);
+      box-sizing: border-box; display: flex; flex-direction: column;
+    }
+    #analyticsDrawer.open { width: 440px; padding: 24px 20px; }
+
+    .drawer-title { font-size: 18px; font-weight: 800; color: #38bdf8; margin-bottom: 12px; }
+    .stat-card {
+      background: #1e293b; border-radius: 8px; padding: 12px; margin-bottom: 12px;
+      border: 1px solid #334155; font-size: 12px;
+    }
+    .stat-card h4 { margin: 0 0 6px 0; color: #facc15; font-size: 13px; }
+    .log-box { max-height: 180px; overflow-y: auto; background: #0b0f19; padding: 8px; border-radius: 6px; font-family: monospace; font-size: 11px; }
+
+    /* Overlay Cuenta Regresiva */
     #countdownOverlay {
-      position: fixed; inset: 0; background: rgba(0,0,0,0.85); z-index: 100;
-      display: none; justify-content: center; align-items: center; flex-direction: column;
+      position: absolute; inset: 0; background: rgba(15, 23, 42, 0.85);
+      display: none; justify-content: center; align-items: center; flex-direction: column; z-index: 50;
     }
-    #countdownText { font-size: 90px; font-weight: 900; color: #f97316; }
+    #countText { font-size: 110px; font-weight: 900; color: #f97316; }
   </style>
-  <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
   <script src="https://unpkg.com/mqtt/dist/mqtt.min.js"></script>
 </head>
 <body>
 
-  <div id="countdownOverlay">
-    <div id="countdownText">3</div>
-    <div style="font-size: 20px; color:#cbd5e1; margin-top: 10px;">¡Preparen las manos!</div>
+  <div id="mainView">
+    <div id="countdownOverlay">
+      <div id="countText">3</div>
+      <div style="font-size: 24px; color: white; font-weight: bold;">¡A sus marcas!</div>
+    </div>
+
+    <header>
+      <h1>🏃‍♂️ CARRERA DE DESTREZA</h1>
+      <div class="header-btns">
+        <button class="btn-start" onclick="iniciarCarrera()">🏁 Dar Salida</button>
+        <button class="btn-analytics" onclick="toggleDrawer()">📊 Ver Análisis</button>
+        <button class="btn-export" onclick="exportarCSV()">📥 Descargar CSV</button>
+      </div>
+    </header>
+
+    <div id="trackContainer">
+      <canvas id="trackCanvas"></canvas>
+    </div>
   </div>
 
-  <div id="panel">
-    <h2>🏆 Gran Carrera Play-Doh</h2>
-    <div class="stat">Meta: <strong>Superar el 70% para avanzar de nivel</strong></div>
-    <div class="stat">Escultores conectados: <strong id="userCount">0</strong></div>
+  <div id="analyticsDrawer">
+    <div class="drawer-title">📈 Telemetría Experimental</div>
     
-    <button class="btn-start" id="btnStartGame" onclick="iniciarCarrera()">🏁 Iniciar Carrera para Todos</button>
-    <button class="btn-reset" onclick="reiniciarTodo()">🔄 Reiniciar Juego</button>
+    <div class="stat-card">
+      <h4>Matriz Gestual Acumulada</h4>
+      <div>Total Pinzas (Estirar): <strong id="totalPinches" style="color:#38bdf8;">0</strong></div>
+      <div>Total Poking (Hundir): <strong id="totalPushes" style="color:#ef4444;">0</strong></div>
+      <div>Ratio Pinza / Hundir: <strong id="ratioPinchPush">0.0</strong></div>
+    </div>
 
-    <div style="margin-top: 12px; font-size: 12px; font-weight: bold; color: #94a3b8;">Progreso de la Carrera:</div>
-    <div id="leaderboard">
-      <div style="color:#64748b; font-size: 11px;">Esperando que se conecten jugadores...</div>
+    <div class="stat-card">
+      <h4>Progreso de Corredores</h4>
+      <div id="drawerRacersList">Esperando jugadores...</div>
+    </div>
+
+    <div class="stat-card" style="flex:1;">
+      <h4>Registro Cronológico de Eventos</h4>
+      <div class="log-box" id="eventLog"></div>
     </div>
   </div>
 
   <script>
-    // 1. Escena Three.js de exhibición de formas
-    const scene = new THREE.Scene();
-    const camera = new THREE.PerspectiveCamera(40, window.innerWidth / window.innerHeight, 0.1, 1000);
-    camera.position.set(0, 0, 8.5);
-
-    const renderer = new THREE.WebGLRenderer({ antialias: true });
-    renderer.setSize(window.innerWidth, window.innerHeight);
-    renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
-    document.body.appendChild(renderer.domElement);
-
-    scene.add(new THREE.AmbientLight(0xffffff, 0.9));
-    const dirLight = new THREE.DirectionalLight(0xffedd5, 1.2);
-    dirLight.position.set(4, 5, 5);
-    scene.add(dirLight);
-
-    // Representación 3D central de exhibición
-    const siluetasGroup = new THREE.Group();
-    scene.add(siluetasGroup);
-
-    // Ecuaciones de los 3 niveles
-    function getRadiusForLevel(lvl, theta) {
-      if (lvl === 1) { // Corazón suave redondeado
-        const t = theta + Math.PI / 2;
-        const x = 16 * Math.pow(Math.sin(t), 3);
-        const y = 13 * Math.cos(t) - 5 * Math.cos(2*t) - 2 * Math.cos(3*t) - Math.cos(4*t);
-        return (Math.hypot(x, y) / 16) * 1.05;
-      } else if (lvl === 2) { // Nube
-        return 0.95 + 0.30 * Math.sin(3 * theta) + 0.15 * Math.cos(6 * theta);
-      } else { // Estrella 5 puntas
-        return 0.95 + 0.45 * Math.cos(5 * theta);
-      }
-    }
-
-    function renderPreviewShape(lvl) {
-      siluetasGroup.clear();
-      const pts = [];
-      for (let i = 0; i <= 180; i++) {
-        const theta = (i / 180) * Math.PI * 2;
-        const r = getRadiusForLevel(lvl, theta);
-        pts.push(new THREE.Vector3(r * Math.cos(theta), r * Math.sin(theta), 0));
-      }
-      const geo = new THREE.BufferGeometry().setFromPoints(pts);
-      const mat = new THREE.LineBasicMaterial({ color: 0x38bdf8, linewidth: 3 });
-      const line = new THREE.Line(geo, mat);
-      siluetasGroup.add(line);
-    }
-    renderPreviewShape(1);
-
-    // 2. MQTT EMQX
     const TOPIC_TELEMETRY = "mcd/dom/telemetry";
-    const TOPIC_CONTROL = "mcd/dom/game_control";
+    const TOPIC_GESTURES  = "mcd/dom/gestures_log";
+    const TOPIC_CONTROL   = "mcd/dom/game_control";
 
-    const racers = new Map(); // id -> { name, level, match, lastSeen }
+    const racers = new Map(); // id -> { id, color, level, match, x, y, lane, pinches, pushes }
+    const telemetryHistory = []; // Para descargar CSV
 
+    let totalPinches = 0;
+    let totalPushes = 0;
+
+    const trackCanvas = document.getElementById("trackCanvas");
+    const ctx = trackCanvas.getContext("2d");
+
+    function resizeTrack() {
+      trackCanvas.width = trackCanvas.clientWidth;
+      trackCanvas.height = trackCanvas.clientHeight;
+    }
+    window.addEventListener("resize", resizeTrack);
+    resizeTrack();
+
+    // Conexión MQTT EMQX
     const client = mqtt.connect("wss://broker.emqx.io:8084/mqtt", {
-      clientId: "host_screen_" + Math.random().toString(16).substring(2, 6),
+      clientId: "host_track_" + Math.random().toString(16).substring(2, 6),
       clean: true
     });
 
     client.on("connect", () => {
-      client.subscribe(TOPIC_TELEMETRY);
+      client.subscribe([TOPIC_TELEMETRY, TOPIC_GESTURES]);
     });
 
     client.on("message", (topic, message) => {
       try {
         const data = JSON.parse(message.toString());
+        
         if (topic === TOPIC_TELEMETRY) {
-          racers.set(data.id, {
-            name: data.id,
-            level: data.level || 1,
-            match: data.match || 0,
-            lastSeen: Date.now()
+          if (!racers.has(data.id)) {
+            racers.set(data.id, {
+              id: data.id,
+              color: data.color || "#6366f1",
+              level: data.level || 1,
+              match: data.match || 0,
+              lane: racers.size,
+              pinches: 0,
+              pushes: 0,
+              lastSeen: Date.now()
+            });
+          }
+          const r = racers.get(data.id);
+          r.level = data.level;
+          r.match = data.match;
+          r.color = data.color || r.color;
+          r.lastSeen = Date.now();
+        }
+
+        if (topic === TOPIC_GESTURES) {
+          if (data.action === "pull") totalPinches++;
+          if (data.action === "push") totalPushes++;
+          
+          if (racers.has(data.userId)) {
+            const r = racers.get(data.userId);
+            if (data.action === "pull") r.pinches++;
+            if (data.action === "push") r.pushes++;
+          }
+
+          telemetryHistory.push({
+            timestamp: new Date().toISOString(),
+            userId: data.userId,
+            color: data.color,
+            level: data.level,
+            action: data.action,
+            match: data.match
           });
-          actualizarLeaderboard();
+
+          // Agregar al log visual
+          const log = document.getElementById("eventLog");
+          const item = document.createElement("div");
+          item.innerText = `[${new Date().toLocaleTimeString()}] ${data.userId}: ${data.action} (Nivel ${data.level})`;
+          log.prepend(item);
+
+          actualizarMetricasUI();
         }
       } catch (e) {}
     });
 
+    // Dibujar Pista de Atletismo (5 Etapas: 1 Gota, 2 Corazón, 3 Flor, 4 Nube, 5 Hueso)
+    function renderTrack() {
+      ctx.clearRect(0, 0, trackCanvas.width, trackCanvas.height);
+      const w = trackCanvas.width;
+      const h = trackCanvas.height;
+
+      const numLanes = Math.max(racers.size, 4);
+      const laneH = h / numLanes;
+
+      // Líneas de carril
+      ctx.strokeStyle = "rgba(255, 255, 255, 0.55)";
+      ctx.lineWidth = 3;
+      for (let i = 0; i <= numLanes; i++) {
+        ctx.beginPath();
+        ctx.moveTo(0, i * laneH);
+        ctx.lineTo(w, i * laneH);
+        ctx.stroke();
+      }
+
+      // 5 Metas Intermedias
+      const numStages = 5;
+      const stageW = (w - 70) / numStages;
+      const nombresEtapas = ["GOTA", "CORAZÓN", "FLOR", "NUBE", "HUESO"];
+
+      for (let s = 1; s <= numStages; s++) {
+        const sx = s * stageW;
+        ctx.strokeStyle = "#000000";
+        ctx.lineWidth = 4;
+        ctx.beginPath();
+        ctx.moveTo(sx, 0);
+        ctx.lineTo(sx, h);
+        ctx.stroke();
+
+        // Rótulo de etapa inclinado
+        ctx.save();
+        ctx.translate(sx - 10, 30);
+        ctx.rotate(-Math.PI / 4);
+        ctx.fillStyle = "#ffffff";
+        ctx.font = "bold 13px sans-serif";
+        ctx.fillText(s === numStages ? "META" : `ETAPA ${s}: ${nombresEtapas[s-1]}`, 0, 0);
+        ctx.restore();
+      }
+
+      // Meta Ajedrezada al final
+      const goalX = w - 40;
+      const sqSize = 10;
+      for (let y = 0; y < h; y += sqSize) {
+        for (let x = goalX; x < w; x += sqSize) {
+          ctx.fillStyle = ((x / sqSize + y / sqSize) % 2 === 0) ? "#ffffff" : "#000000";
+          ctx.fillRect(x, y, sqSize, sqSize);
+        }
+      }
+
+      // Dibujar Corredores Monitos
+      let idx = 0;
+      for (const [id, r] of racers.entries()) {
+        const laneY = (idx + 0.5) * laneH;
+        
+        // Avance según nivel y % de coincidencia
+        const baseLevelProgress = (r.level - 1) * stageW;
+        const intraStageProgress = (Math.min(r.match, 70) / 70) * stageW;
+        const runnerX = Math.min(w - 60, 20 + baseLevelProgress + intraStageProgress);
+
+        dibujarMonitoCorredor(ctx, runnerX, laneY, r.color);
+        
+        // Etiqueta del corredor
+        ctx.fillStyle = "#0f172a";
+        ctx.font = "bold 11px sans-serif";
+        ctx.fillText(`${r.id} (L${r.level}: ${r.match}%)`, runnerX - 20, laneY - 26);
+        idx++;
+      }
+
+      requestAnimationFrame(renderTrack);
+    }
+    renderTrack();
+
+    // Silueta 2D del Corredor Estilizado
+    function dibujarMonitoCorredor(c, x, y, color) {
+      c.save();
+      c.fillStyle = color;
+      c.strokeStyle = color;
+      c.lineWidth = 4;
+      c.lineCap = "round";
+
+      // Cabeza
+      c.beginPath();
+      c.arc(x, y - 16, 7, 0, Math.PI * 2);
+      c.fill();
+
+      // Tronco inclinado
+      c.beginPath();
+      c.moveTo(x - 4, y - 9);
+      c.lineTo(x + 5, y + 4);
+      c.stroke();
+
+      // Brazos corriendo
+      c.beginPath();
+      c.moveTo(x + 2, y - 5);
+      c.lineTo(x + 12, y - 2);
+      c.lineTo(x + 8, y + 7);
+      c.stroke();
+
+      // Piernas corriendo
+      c.beginPath();
+      c.moveTo(x + 5, y + 4);
+      c.lineTo(x + 14, y + 14);
+      c.lineTo(x + 8, y + 20);
+      c.moveTo(x + 5, y + 4);
+      c.lineTo(x - 7, y + 11);
+      c.lineTo(x - 14, y + 16);
+      c.stroke();
+
+      c.restore();
+    }
+
+    function toggleDrawer() {
+      document.getElementById("analyticsDrawer").classList.toggle("open");
+    }
+
+    function actualizarMetricasUI() {
+      document.getElementById("totalPinches").innerText = totalPinches;
+      document.getElementById("totalPushes").innerText = totalPushes;
+      const ratio = totalPushes > 0 ? (totalPinches / totalPushes).toFixed(2) : totalPinches;
+      document.getElementById("ratioPinchPush").innerText = ratio;
+
+      let html = "";
+      for (const [id, r] of racers.entries()) {
+        html += `<div><strong>${r.id}</strong> (Color: <span style="color:${r.color}">●</span>): ${r.pinches} Pinzas | ${r.pushes} Pushing</div>`;
+      }
+      document.getElementById("drawerRacersList").innerHTML = html || "Sin datos aún.";
+    }
+
     function iniciarCarrera() {
       const overlay = document.getElementById("countdownOverlay");
-      const txt = document.getElementById("countdownText");
+      const txt = document.getElementById("countText");
       overlay.style.display = "flex";
 
       let count = 3;
@@ -163,7 +331,7 @@
           txt.innerText = count;
         } else if (count === 0) {
           txt.innerText = "¡MOLDEEN!";
-          client.publish(TOPIC_CONTROL, JSON.stringify({ action: "START_GAME" }));
+          client.publish(TOPIC_CONTROL, JSON.stringify({ action: "START_RACE" }));
         } else {
           clearInterval(timer);
           overlay.style.display = "none";
@@ -171,67 +339,24 @@
       }, 1000);
     }
 
-    function reiniciarTodo() {
-      client.publish(TOPIC_CONTROL, JSON.stringify({ action: "RESET_ALL" }));
-      racers.clear();
-      actualizarLeaderboard();
-    }
-
-    const leaderboardEl = document.getElementById("leaderboard");
-    const userCountEl = document.getElementById("userCount");
-
-    function actualizarLeaderboard() {
-      const now = Date.now();
-      // Eliminar inactivos tras 6s
-      for (const [id, r] of racers.entries()) {
-        if (now - r.lastSeen > 6000) racers.delete(id);
-      }
-
-      userCountEl.innerText = racers.size;
-
-      // Ordenar por nivel descendente y luego por % match
-      const ordenados = Array.from(racers.values()).sort((a, b) => {
-        if (b.level !== a.level) return b.level - a.level;
-        return b.match - a.match;
-      });
-
-      if (ordenados.length === 0) {
-        leaderboardEl.innerHTML = `<div style="color:#64748b; font-size:11px;">Esperando que se conecten jugadores...</div>`;
+    function exportarCSV() {
+      if (telemetryHistory.length === 0) {
+        alert("Aún no hay datos de telemetría registrados.");
         return;
       }
-
-      let html = "";
-      ordenados.forEach((r, idx) => {
-        const nivelNombre = r.level === 1 ? "❤️ Corazón" : r.level === 2 ? "☁️ Nube" : r.level === 3 ? "⭐ Estrella" : "🏆 ¡GANADOR!";
-        html += `
-          <div class="racer-card">
-            <div class="racer-header">
-              <span class="racer-name">#${idx + 1} ${r.name}</span>
-              <span class="racer-lvl">${nivelNombre} (${r.match}%)</span>
-            </div>
-            <div class="track-bg">
-              <div class="track-mark"></div>
-              <div class="track-fill" style="width: ${r.match}%;"></div>
-            </div>
-          </div>
-        `;
+      let csvContent = "data:text/csv;charset=utf-8,Timestamp,UserId,Color,Level,Action,MatchPercent\n";
+      telemetryHistory.forEach(row => {
+        csvContent += `${row.timestamp},${row.userId},${row.color},${row.level},${row.action},${row.match}\n`;
       });
 
-      leaderboardEl.innerHTML = html;
+      const encodedUri = encodeURI(csvContent);
+      const link = document.createElement("a");
+      link.setAttribute("href", encodedUri);
+      link.setAttribute("download", `telemetria_carrera_${Date.now()}.csv`);
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
     }
-
-    function animate() {
-      requestAnimationFrame(animate);
-      siluetasGroup.rotation.z += 0.002;
-      renderer.render(scene, camera);
-    }
-    animate();
-
-    window.addEventListener("resize", () => {
-      camera.aspect = window.innerWidth / window.innerHeight;
-      camera.updateProjectionMatrix();
-      renderer.setSize(window.innerWidth, window.innerHeight);
-    });
   </script>
 </body>
 </html>
