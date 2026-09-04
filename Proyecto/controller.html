@@ -286,32 +286,60 @@
     // =========================================================
     // MATEMÁTICA UNIFICADA: DIBUJO Y EVALUACIÓN 100% IDÉNTICOS
     // =========================================================
-    function getRadiusTarget(theta, lvl) {
-      if (lvl === 1) { // 1. GOTA (Punta arriba, base ancha abajo)
-        const t = theta + Math.PI / 2;
-        return 0.90 * (1 - 0.45 * Math.sin(t));
-      } else if (lvl === 2) { // 2. CORAZÓN (Hendidura superior)
-        const t = theta + Math.PI / 2;
-        const x = 16 * Math.pow(Math.sin(t), 3);
-        const y = 13 * Math.cos(t) - 5 * Math.cos(2*t) - 2 * Math.cos(3*t) - Math.cos(4*t);
-        return (Math.hypot(x, y) / 16) * 1.05;
-      } else if (lvl === 3) { // 3. FLOR (5 pétalos)
-        return 0.88 + 0.38 * Math.cos(5 * theta);
-      } else if (lvl === 4) { // 4. NUBE (Corregida: 3 cúmulos arriba, base aplanada)
-        // theta = -PI/2 es abajo (base plana)
-        if (Math.sin(theta) < -0.2) {
-          // Borde inferior plano
-          return 0.62 / Math.max(0.35, Math.abs(Math.sin(theta)));
-        }
-        // Cúmulos superiores
-        return 0.95 + 0.30 * Math.sin(3 * theta) + 0.12 * Math.cos(6 * theta);
-      } else { // 5. HUESO (Adelgazamiento central + 4 lóbulos)
-        const cos2 = Math.cos(2 * theta);
-        return 0.95 + 0.40 * Math.abs(cos2) - 0.22 * Math.abs(Math.sin(2 * theta));
-      }
-    }
+    // Radios normalizados con orientación correcta (+Y = Arriba, -Y = Abajo)
+function getRadiusTarget(theta, lvl) {
+  // theta va de 0 a 2*PI (0: derecha, PI/2: arriba, PI: izquierda, 3*PI/2: abajo)
 
-    const nombresFormas = ["", "💧 Gota", "❤️ Corazón", "🌸 Flor", "☁️ Nube", "🦴 Hueso"];
+  if (lvl === 1) {
+    // 1. GOTA ESBELTA: Base redonda abajo, punta afilada arriba (theta = PI/2)
+    // Se afina progresivamente en el cuadrante superior
+    const sinT = Math.sin(theta);
+    if (sinT > 0) {
+      // Mitad superior: punta cónica estilizada
+      return 0.75 + 0.55 * Math.pow(sinT, 2.2);
+    } else {
+      // Mitad inferior: base globular perfectamente redondeada
+      return 0.75 + 0.10 * Math.abs(sinT);
+    }
+  }
+
+  else if (lvl === 2) {
+    // 2. CORAZÓN DERECHO: Lóbulos arriba (PI/2), hendidura central y punta abajo (-PI/2)
+    const t = theta - Math.PI / 2;
+    const x = 16 * Math.pow(Math.sin(t), 3);
+    const y = -(13 * Math.cos(t) - 5 * Math.cos(2*t) - 2 * Math.cos(3*t) - Math.cos(4*t));
+    return (Math.hypot(x, y) / 16) * 1.15;
+  }
+
+  else if (lvl === 3) {
+    // 3. NUBE ESPONJOSA: 3 cúpulas redondeadas arriba y base plana asentada abajo
+    const sinT = Math.sin(theta);
+    const cosT = Math.cos(theta);
+    if (sinT < -0.2) {
+      // Base inferior aplanada y suave
+      return 0.65;
+    } else {
+      // 3 cúmulos convexos bien definidos
+      return 0.85 + 0.35 * Math.sin(3 * theta);
+    }
+  }
+
+  else if (lvl === 4) {
+    // 4. HUESO HORIZONTAL: Cintura estrecha en el centro (arriba/abajo) y extremos anchos (izq/der)
+    // Evita la forma de cruz modulando solo la horizontalidad
+    const cos2 = Math.cos(2 * theta);
+    const radioBase = 0.88;
+    // Ensancha en theta = 0 y PI (lados), adelgaza en PI/2 y 3PI/2 (centro)
+    return radioBase + 0.38 * cos2;
+  }
+
+  else {
+    // 5. FLOR DE 5 PÉTALOS: Simetría radial balanceada y valles profundos
+    return 0.85 + 0.42 * Math.cos(5 * (theta - Math.PI / 2));
+  }
+}
+
+const nombresFormas = ["", "💧 Gota", "❤️ Corazón", "☁️ Nube", "🦴 Hueso", "🌸 Flor"];
 
     function iniciarJuegoAR() {
       gameActive = true;
@@ -353,20 +381,44 @@
       function dibujarSiluetaAltoContraste(w, h) {
         const cx = w / 2;
         const cy = h / 2;
-        const pxScale = Math.min(w, h) * 0.24;
+        const pxScale = Math.min(w, h) * 0.25;
 
         uiCtx.save();
         uiCtx.beginPath();
-        for (let i = 0; i <= 180; i++) {
-          const theta = (i / 180) * Math.PI * 2;
-          const r = getRadiusTarget(theta, currentLevel) * pxScale;
-          const x = cx + r * Math.cos(theta);
-          const y = cy - r * Math.sin(theta);
-          if (i === 0) uiCtx.moveTo(x, y);
-          else uiCtx.lineTo(x, y);
+
+        // Muestreo paramétrico de 360 grados
+        for (let i = 0; i <= 200; i++) {
+            const theta = (i / 200) * Math.PI * 2;
+            const r = getRadiusTarget(theta, currentLevel) * pxScale;
+            
+            // En Canvas 2D: +Y baja, por eso restamos r * sin(theta) para que quede derecho
+            const x = cx + r * Math.cos(theta);
+            const y = cy - r * Math.sin(theta);
+
+            if (i === 0) uiCtx.moveTo(x, y);
+            else uiCtx.lineTo(x, y);
         }
         uiCtx.closePath();
 
+        // Relleno de contraste sutil
+        uiCtx.fillStyle = "rgba(15, 23, 42, 0.40)";
+        uiCtx.fill();
+
+        // Borde fluorescente cian
+        uiCtx.strokeStyle = "#38bdf8";
+        uiCtx.lineWidth = 5;
+        uiCtx.shadowColor = "#0284c7";
+        uiCtx.shadowBlur = 12;
+        uiCtx.stroke();
+
+        // Línea guía interior blanca nítida
+        uiCtx.strokeStyle = "#ffffff";
+        uiCtx.lineWidth = 1.5;
+        uiCtx.shadowBlur = 0;
+        uiCtx.stroke();
+
+        uiCtx.restore();
+        }
         uiCtx.fillStyle = "rgba(15, 23, 42, 0.35)";
         uiCtx.fill();
         uiCtx.strokeStyle = "#38bdf8";
