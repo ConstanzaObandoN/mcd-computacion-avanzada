@@ -4,54 +4,117 @@
   <meta charset="UTF-8">
   <title>Carrera de Destreza - Pantalla Central</title>
   <style>
-    body { margin: 0; overflow: hidden; background: #fdfbf7; color: #0f172a; font-family: 'Segoe UI', system-ui, sans-serif; display: flex; width: 100vw; height: 100vh; }
-    
-    /* Contenedor Principal (Pista de Atletismo) */
+    body {
+      margin: 0;
+      overflow: hidden;
+      background: #fdfbf7;
+      color: #0f172a;
+      font-family: system-ui, -apple-system, sans-serif;
+      display: flex;
+      width: 100vw;
+      height: 100vh;
+    }
+
     #mainView {
-      flex: 1; height: 100vh; display: flex; flex-direction: column;
-      transition: all 0.3s ease; position: relative;
+      flex: 1;
+      height: 100vh;
+      display: flex;
+      flex-direction: column;
+      position: relative;
+      transition: all 0.3s ease;
     }
 
     header {
-      padding: 16px 24px; display: flex; justify-content: space-between; align-items: center;
-      border-bottom: 2px solid #e2e8f0; background: #ffffff;
+      padding: 12px 20px;
+      display: flex;
+      justify-content: flex-end;
+      align-items: center;
+      gap: 12px;
+      position: absolute;
+      top: 0;
+      right: 0;
+      z-index: 10;
+      background: rgba(255, 255, 255, 0.85);
+      backdrop-filter: blur(6px);
+      border-bottom-left-radius: 12px;
+      border-left: 1px solid #e2e8f0;
+      border-bottom: 1px solid #e2e8f0;
     }
-    h1 { margin: 0; font-size: 26px; font-weight: 900; color: #6366f1; letter-spacing: -0.5px; }
 
-    .header-btns { display: flex; gap: 10px; }
     button {
-      border: none; border-radius: 8px; padding: 10px 16px; font-weight: bold;
-      cursor: pointer; font-size: 13px; transition: all 0.2s;
+      border: none;
+      border-radius: 8px;
+      padding: 9px 15px;
+      font-weight: 800;
+      cursor: pointer;
+      font-size: 13px;
+      transition: transform 0.1s, background 0.2s;
     }
+    button:active { transform: scale(0.96); }
     .btn-start { background: #22c55e; color: white; }
     .btn-start:hover { background: #16a34a; }
     .btn-analytics { background: #6366f1; color: white; }
     .btn-export { background: #0ea5e9; color: white; }
 
-    /* Canvas de Pista de Atletismo */
-    #trackContainer { flex: 1; position: relative; background: #84cc16; overflow: hidden; }
-    canvas#trackCanvas { width: 100%; height: 100%; display: block; }
-
-    /* Panel Lateral de Analítica (Drawer) */
-    #analyticsDrawer {
-      width: 0; height: 100vh; background: #0f172a; color: #f8fafc;
-      overflow-y: auto; transition: width 0.3s ease; box-shadow: -4px 0 20px rgba(0,0,0,0.25);
-      box-sizing: border-box; display: flex; flex-direction: column;
+    #trackContainer {
+      flex: 1;
+      width: 100%;
+      height: 100%;
+      position: relative;
     }
-    #analyticsDrawer.open { width: 440px; padding: 24px 20px; }
+    canvas#trackCanvas {
+      width: 100%;
+      height: 100%;
+      display: block;
+    }
+
+    /* Panel Lateral de Analítica */
+    #analyticsDrawer {
+      width: 0;
+      height: 100vh;
+      background: #0f172a;
+      color: #f8fafc;
+      overflow-y: auto;
+      transition: width 0.3s ease;
+      box-sizing: border-box;
+      display: flex;
+      flex-direction: column;
+      box-shadow: -4px 0 25px rgba(0,0,0,0.3);
+    }
+    #analyticsDrawer.open {
+      width: 420px;
+      padding: 24px 20px;
+    }
 
     .drawer-title { font-size: 18px; font-weight: 800; color: #38bdf8; margin-bottom: 12px; }
     .stat-card {
-      background: #1e293b; border-radius: 8px; padding: 12px; margin-bottom: 12px;
-      border: 1px solid #334155; font-size: 12px;
+      background: #1e293b;
+      border-radius: 8px;
+      padding: 12px;
+      margin-bottom: 12px;
+      border: 1px solid #334155;
+      font-size: 12px;
     }
     .stat-card h4 { margin: 0 0 6px 0; color: #facc15; font-size: 13px; }
-    .log-box { max-height: 180px; overflow-y: auto; background: #0b0f19; padding: 8px; border-radius: 6px; font-family: monospace; font-size: 11px; }
+    .log-box {
+      max-height: 180px;
+      overflow-y: auto;
+      background: #0b0f19;
+      padding: 8px;
+      border-radius: 6px;
+      font-family: monospace;
+      font-size: 11px;
+    }
 
-    /* Overlay Cuenta Regresiva */
     #countdownOverlay {
-      position: absolute; inset: 0; background: rgba(15, 23, 42, 0.85);
-      display: none; justify-content: center; align-items: center; flex-direction: column; z-index: 50;
+      position: absolute;
+      inset: 0;
+      background: rgba(15, 23, 42, 0.88);
+      display: none;
+      justify-content: center;
+      align-items: center;
+      flex-direction: column;
+      z-index: 50;
     }
     #countText { font-size: 110px; font-weight: 900; color: #f97316; }
   </style>
@@ -66,12 +129,9 @@
     </div>
 
     <header>
-      <h1>🏃‍♂️ CARRERA DE DESTREZA</h1>
-      <div class="header-btns">
-        <button class="btn-start" onclick="iniciarCarrera()">🏁 Dar Salida</button>
-        <button class="btn-analytics" onclick="toggleDrawer()">📊 Ver Análisis</button>
-        <button class="btn-export" onclick="exportarCSV()">📥 Descargar CSV</button>
-      </div>
+      <button class="btn-start" onclick="iniciarCarrera()">🏁 Dar Salida</button>
+      <button class="btn-analytics" onclick="toggleDrawer()">📊 Ver Análisis</button>
+      <button class="btn-export" onclick="exportarCSV()">📥 Descargar CSV</button>
     </header>
 
     <div id="trackContainer">
@@ -81,7 +141,7 @@
 
   <div id="analyticsDrawer">
     <div class="drawer-title">📈 Telemetría Experimental</div>
-    
+
     <div class="stat-card">
       <h4>Matriz Gestual Acumulada</h4>
       <div>Total Pinzas (Estirar): <strong id="totalPinches" style="color:#38bdf8;">0</strong></div>
@@ -91,11 +151,11 @@
 
     <div class="stat-card">
       <h4>Progreso de Corredores</h4>
-      <div id="drawerRacersList">Esperando jugadores...</div>
+      <div id="drawerRacersList">Esperando participantes...</div>
     </div>
 
     <div class="stat-card" style="flex:1;">
-      <h4>Registro Cronológico de Eventos</h4>
+      <h4>Registro Cronológico</h4>
       <div class="log-box" id="eventLog"></div>
     </div>
   </div>
@@ -105,14 +165,21 @@
     const TOPIC_GESTURES  = "mcd/dom/gestures_log";
     const TOPIC_CONTROL   = "mcd/dom/game_control";
 
-    const racers = new Map(); // id -> { id, color, level, match, x, y, lane, pinches, pushes }
-    const telemetryHistory = []; // Para descargar CSV
+    const racers = new Map();
+    const telemetryHistory = [];
 
     let totalPinches = 0;
     let totalPushes = 0;
 
     const trackCanvas = document.getElementById("trackCanvas");
     const ctx = trackCanvas.getContext("2d");
+
+    // Cargar Imágenes Personalizadas
+    const bgImg = new Image();
+    bgImg.src = "assets/pista.png";
+
+    const runnerImg = new Image();
+    runnerImg.src = "assets/runner.png";
 
     function resizeTrack() {
       trackCanvas.width = trackCanvas.clientWidth;
@@ -121,9 +188,9 @@
     window.addEventListener("resize", resizeTrack);
     resizeTrack();
 
-    // Conexión MQTT EMQX
+    // MQTT EMQX
     const client = mqtt.connect("wss://broker.emqx.io:8084/mqtt", {
-      clientId: "host_track_" + Math.random().toString(16).substring(2, 6),
+      clientId: "host_screen_" + Math.random().toString(16).substring(2, 6),
       clean: true
     });
 
@@ -134,12 +201,12 @@
     client.on("message", (topic, message) => {
       try {
         const data = JSON.parse(message.toString());
-        
+
         if (topic === TOPIC_TELEMETRY) {
           if (!racers.has(data.id)) {
             racers.set(data.id, {
               id: data.id,
-              color: data.color || "#6366f1",
+              color: data.color || "#3b82f6",
               level: data.level || 1,
               match: data.match || 0,
               lane: racers.size,
@@ -158,7 +225,7 @@
         if (topic === TOPIC_GESTURES) {
           if (data.action === "pull") totalPinches++;
           if (data.action === "push") totalPushes++;
-          
+
           if (racers.has(data.userId)) {
             const r = racers.get(data.userId);
             if (data.action === "pull") r.pinches++;
@@ -174,10 +241,9 @@
             match: data.match
           });
 
-          // Agregar al log visual
           const log = document.getElementById("eventLog");
           const item = document.createElement("div");
-          item.innerText = `[${new Date().toLocaleTimeString()}] ${data.userId}: ${data.action} (Nivel ${data.level})`;
+          item.innerText = `[${new Date().toLocaleTimeString()}] ${data.userId}: ${data.action} (L${data.level})`;
           log.prepend(item);
 
           actualizarMetricasUI();
@@ -185,120 +251,93 @@
       } catch (e) {}
     });
 
-    // Dibujar Pista de Atletismo (5 Etapas: 1 Gota, 2 Corazón, 3 Flor, 4 Nube, 5 Hueso)
+    // Función para tintar dinámicamente runner.png con el color elegido
+    const runnerColorCache = new Map();
+    function getTintedRunner(color) {
+      if (runnerColorCache.has(color)) return runnerColorCache.get(color);
+
+      const offCanvas = document.createElement("canvas");
+      offCanvas.width = runnerImg.width || 120;
+      offCanvas.height = runnerImg.height || 120;
+      const offCtx = offCanvas.getContext("2d");
+
+      // Dibujar silueta original
+      offCtx.drawImage(runnerImg, 0, 0, offCanvas.width, offCanvas.height);
+      // Aplicar tinte del color
+      offCtx.globalCompositeOperation = "source-in";
+      offCtx.fillStyle = color;
+      offCtx.fillRect(0, 0, offCanvas.width, offCanvas.height);
+
+      runnerColorCache.set(color, offCanvas);
+      return offCanvas;
+    }
+
+    // Bucle de Renderizado de la Pista
     function renderTrack() {
-      ctx.clearRect(0, 0, trackCanvas.width, trackCanvas.height);
       const w = trackCanvas.width;
       const h = trackCanvas.height;
 
-      const numLanes = Math.max(racers.size, 4);
-      const laneH = h / numLanes;
-
-      // Líneas de carril
-      ctx.strokeStyle = "rgba(255, 255, 255, 0.55)";
-      ctx.lineWidth = 3;
-      for (let i = 0; i <= numLanes; i++) {
-        ctx.beginPath();
-        ctx.moveTo(0, i * laneH);
-        ctx.lineTo(w, i * laneH);
-        ctx.stroke();
+      // 1. Dibujar Imagen de Fondo de la Pista
+      if (bgImg.complete && bgImg.naturalWidth > 0) {
+        ctx.drawImage(bgImg, 0, 0, w, h);
+      } else {
+        ctx.fillStyle = "#fba94b";
+        ctx.fillRect(0, 0, w, h);
       }
 
-      // 5 Metas Intermedias
-      const numStages = 5;
-      const stageW = (w - 70) / numStages;
-      const nombresEtapas = ["GOTA", "CORAZÓN", "FLOR", "NUBE", "HUESO"];
+      // Parámetros geométricos alineados con pista.png:
+      // La pista tiene 8 carriles en la franja inferior (aproximadamente desde el 38% del alto hasta el 100%)
+      const topOffset = h * 0.38;
+      const trackAreaH = h - topOffset;
+      const numLanes = 8;
+      const laneH = trackAreaH / numLanes;
 
-      for (let s = 1; s <= numStages; s++) {
-        const sx = s * stageW;
-        ctx.strokeStyle = "#000000";
-        ctx.lineWidth = 4;
-        ctx.beginPath();
-        ctx.moveTo(sx, 0);
-        ctx.lineTo(sx, h);
-        ctx.stroke();
+      // Las 5 líneas de etapa en pista.png están distribuidas proporcionalmente
+      // Salida: ~12.5% del ancho | Meta final: ~94.5% del ancho
+      const startX = w * 0.02;
+      const goalX = w * 0.945;
+      const totalDist = goalX - startX;
+      const stageDist = totalDist / 5;
 
-        // Rótulo de etapa inclinado
-        ctx.save();
-        ctx.translate(sx - 10, 30);
-        ctx.rotate(-Math.PI / 4);
-        ctx.fillStyle = "#ffffff";
-        ctx.font = "bold 13px sans-serif";
-        ctx.fillText(s === numStages ? "META" : `ETAPA ${s}: ${nombresEtapas[s-1]}`, 0, 0);
-        ctx.restore();
-      }
-
-      // Meta Ajedrezada al final
-      const goalX = w - 40;
-      const sqSize = 10;
-      for (let y = 0; y < h; y += sqSize) {
-        for (let x = goalX; x < w; x += sqSize) {
-          ctx.fillStyle = ((x / sqSize + y / sqSize) % 2 === 0) ? "#ffffff" : "#000000";
-          ctx.fillRect(x, y, sqSize, sqSize);
-        }
-      }
-
-      // Dibujar Corredores Monitos
-      let idx = 0;
+      // 2. Dibujar Corredores usando runner.png
+      let laneIdx = 0;
       for (const [id, r] of racers.entries()) {
-        const laneY = (idx + 0.5) * laneH;
-        
-        // Avance según nivel y % de coincidencia
-        const baseLevelProgress = (r.level - 1) * stageW;
-        const intraStageProgress = (Math.min(r.match, 70) / 70) * stageW;
-        const runnerX = Math.min(w - 60, 20 + baseLevelProgress + intraStageProgress);
+        const assignedLane = laneIdx % numLanes;
+        const laneCenterY = topOffset + (assignedLane + 0.5) * laneH;
 
-        dibujarMonitoCorredor(ctx, runnerX, laneY, r.color);
-        
-        // Etiqueta del corredor
+        // Calcular posición X del corredor (Nivel 1..5 y avance de 0 a 70%)
+        const completedStagesDist = (r.level - 1) * stageDist;
+        const currentStageDist = (Math.min(r.match, 70) / 70) * stageDist;
+        const runnerX = Math.min(goalX, startX + completedStagesDist + currentStageDist);
+
+        const runnerSize = laneH * 0.85;
+        const runnerY = laneCenterY - runnerSize / 2;
+
+        if (runnerImg.complete && runnerImg.naturalWidth > 0) {
+          const tinted = getTintedRunner(r.color);
+          ctx.drawImage(tinted, runnerX - runnerSize * 0.4, runnerY, runnerSize, runnerSize);
+        } else {
+          // Fallback círculo si la imagen aún carga
+          ctx.beginPath();
+          ctx.arc(runnerX, laneCenterY, 14, 0, Math.PI * 2);
+          ctx.fillStyle = r.color;
+          ctx.fill();
+        }
+
+        // Nombre y porcentaje
         ctx.fillStyle = "#0f172a";
-        ctx.font = "bold 11px sans-serif";
-        ctx.fillText(`${r.id} (L${r.level}: ${r.match}%)`, runnerX - 20, laneY - 26);
-        idx++;
+        ctx.font = "bold 11px system-ui";
+        ctx.fillText(`${r.id} (L${r.level}: ${r.match}%)`, runnerX - 15, runnerY - 4);
+
+        laneIdx++;
       }
 
       requestAnimationFrame(renderTrack);
     }
-    renderTrack();
 
-    // Silueta 2D del Corredor Estilizado
-    function dibujarMonitoCorredor(c, x, y, color) {
-      c.save();
-      c.fillStyle = color;
-      c.strokeStyle = color;
-      c.lineWidth = 4;
-      c.lineCap = "round";
-
-      // Cabeza
-      c.beginPath();
-      c.arc(x, y - 16, 7, 0, Math.PI * 2);
-      c.fill();
-
-      // Tronco inclinado
-      c.beginPath();
-      c.moveTo(x - 4, y - 9);
-      c.lineTo(x + 5, y + 4);
-      c.stroke();
-
-      // Brazos corriendo
-      c.beginPath();
-      c.moveTo(x + 2, y - 5);
-      c.lineTo(x + 12, y - 2);
-      c.lineTo(x + 8, y + 7);
-      c.stroke();
-
-      // Piernas corriendo
-      c.beginPath();
-      c.moveTo(x + 5, y + 4);
-      c.lineTo(x + 14, y + 14);
-      c.lineTo(x + 8, y + 20);
-      c.moveTo(x + 5, y + 4);
-      c.lineTo(x - 7, y + 11);
-      c.lineTo(x - 14, y + 16);
-      c.stroke();
-
-      c.restore();
-    }
+    bgImg.onload = () => requestAnimationFrame(renderTrack);
+    runnerImg.onload = () => requestAnimationFrame(renderTrack);
+    requestAnimationFrame(renderTrack);
 
     function toggleDrawer() {
       document.getElementById("analyticsDrawer").classList.toggle("open");
@@ -312,9 +351,9 @@
 
       let html = "";
       for (const [id, r] of racers.entries()) {
-        html += `<div><strong>${r.id}</strong> (Color: <span style="color:${r.color}">●</span>): ${r.pinches} Pinzas | ${r.pushes} Pushing</div>`;
+        html += `<div><strong>${r.id}</strong> (<span style="color:${r.color}">●</span>): ${r.pinches} Pinzas | ${r.pushes} Poking | Nivel ${r.level}</div>`;
       }
-      document.getElementById("drawerRacersList").innerHTML = html || "Sin datos aún.";
+      document.getElementById("drawerRacersList").innerHTML = html || "Esperando participantes...";
     }
 
     function iniciarCarrera() {

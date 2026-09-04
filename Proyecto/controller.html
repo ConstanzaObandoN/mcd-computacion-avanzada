@@ -10,13 +10,11 @@
       font-family: system-ui, -apple-system, sans-serif; overflow: hidden; touch-action: none;
     }
 
-    /* Vistas del Onboarding */
     .screen { position: fixed; inset: 0; display: none; flex-direction: column; padding: 20px; box-sizing: border-box; }
     .screen.active { display: flex; }
 
     h2 { font-size: 24px; font-weight: 900; color: #6366f1; margin: 0 0 16px 0; text-align: center; }
 
-    /* Paso 1: Selector de Color */
     .color-grid { display: grid; grid-template-columns: repeat(5, 1fr); gap: 14px; margin: 20px auto; max-width: 320px; }
     .color-dot {
       width: 48px; height: 48px; border-radius: 50%; border: 3px solid white;
@@ -24,7 +22,6 @@
     }
     .color-dot.selected { border-color: #0f172a; transform: scale(1.15); }
 
-    /* Pasos 2 y 3: Calibración */
     .calib-container { display: flex; flex-direction: column; align-items: center; justify-content: space-around; flex: 1; }
     .calib-box { position: relative; width: 260px; height: 260px; border-radius: 16px; overflow: hidden; background: #000; box-shadow: 0 8px 25px rgba(0,0,0,0.2); }
     .calib-box video, .calib-box canvas { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; transform: scaleX(-1); }
@@ -35,7 +32,6 @@
     }
     .btn-next:disabled { background: #94a3b8; cursor: not-allowed; }
 
-    /* Pantalla 4: Juego AR Activo */
     #viewport { position: relative; width: 100vw; height: 75vh; background: #000; }
     #webcam { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; transform: scaleX(-1); z-index: 1; }
     #uiCanvas { position: absolute; inset: 0; width: 100%; height: 100%; z-index: 2; pointer-events: none; }
@@ -71,7 +67,7 @@
 </head>
 <body>
 
-  <!-- PASO 1: ESCOGE UN COLOR -->
+  <!-- PASO 1: COLOR -->
   <div id="screenColor" class="screen active">
     <h2>🏃‍♂️ ESCOGE UN COLOR</h2>
     <div style="text-align:center; color:#64748b; font-size:14px;">Elige el color de tu corredor en la pista:</div>
@@ -79,7 +75,7 @@
     <button class="btn-next" onclick="goToStep(2)">Continuar ➜</button>
   </div>
 
-  <!-- PASO 2: CALIBRAR APLASTAR (POKING) -->
+  <!-- PASO 2: GESTO APLASTAR -->
   <div id="screenCalibPush" class="screen">
     <h2>INSTRUCCIONES</h2>
     <div style="font-size:18px; font-weight:800; text-align:center; margin-bottom: 8px;">☝️ GESTO PARA APLASTAR</div>
@@ -89,11 +85,11 @@
         <video id="calibVideo1" playsinline muted></video>
         <canvas id="calibCanvas1"></canvas>
       </div>
-      <button class="btn-next" id="btnNextPush" disabled onclick="goToStep(3)">PROBEMOS (Detectado) ➜</button>
+      <button class="btn-next" id="btnNextPush" disabled onclick="goToStep(3)">PROBEMOS ➜</button>
     </div>
   </div>
 
-  <!-- PASO 3: CALIBRAR ESTIRAR (PINZA) -->
+  <!-- PASO 3: GESTO ESTIRAR -->
   <div id="screenCalibPull" class="screen">
     <h2>INSTRUCCIONES</h2>
     <div style="font-size:18px; font-weight:800; text-align:center; margin-bottom: 8px;">🤏 GESTO PARA ESTIRAR</div>
@@ -107,7 +103,7 @@
     </div>
   </div>
 
-  <!-- PASO 4: SALA DE ESPERA / LOBBY -->
+  <!-- PASO 4: LOBBY -->
   <div id="screenLobby" class="screen" style="justify-content:center; align-items:center; text-align:center;">
     <div id="lobbyAvatar" style="width:80px; height:80px; border-radius:50%; margin-bottom:16px;"></div>
     <h2>¡ESTÁS EN LA SALA DE ESPERA!</h2>
@@ -116,7 +112,7 @@
     </div>
   </div>
 
-  <!-- PASO 5: JUEGO AR ACTIVO -->
+  <!-- PASO 5: JUEGO ACTIVO -->
   <div id="screenGame" class="screen" style="padding:0;">
     <div id="viewport">
       <video id="webcam" playsinline muted></video>
@@ -139,9 +135,9 @@
         <span>Corredor: <strong id="lblPlayerId"></strong></span>
         <span>Meta: <strong>&gt;70%</strong></span>
       </div>
-      <div class="gesture-badge" id="lblCurrentAction">✋ Esperando gesto...</div>
+      <div class="gesture-badge" id="lblCurrentAction">✋ Esperando manos...</div>
       <div style="font-size:11px; color:#94a3b8; text-align:center;">
-        ☝️ Índice = Aplastar | 🤏 Pinza = Estirar
+        ☝️ 1 Dedo = Aplastar | 🤏 Pinza = Estirar
       </div>
     </div>
   </div>
@@ -164,7 +160,7 @@
     let currentMatch = 0;
     let gameActive = false;
 
-    // Generar Paleta de Colores
+    // Selector de Color
     const colorGrid = document.getElementById("colorGrid");
     COLORS.forEach(c => {
       const dot = document.createElement("div");
@@ -178,7 +174,6 @@
       colorGrid.appendChild(dot);
     });
 
-    // Control de Pantallas
     function goToStep(step) {
       document.querySelectorAll(".screen").forEach(s => s.classList.remove("active"));
       if (step === 2) {
@@ -218,7 +213,6 @@
       } catch (e) {}
     });
 
-    // MediaPipe Hand Connections
     const HAND_CONNECTIONS = [
       [0,1],[1,2],[2,3],[3,4],[0,5],[5,6],[6,7],[7,8],
       [5,9],[9,10],[10,11],[11,12],[9,13],[13,14],[14,15],[15,16],
@@ -243,7 +237,6 @@
       return { action: "idle", label: "✋ Reposo", point: { x: lm[9].x, y: lm[9].y }, force: 0.0 };
     }
 
-    // Cámara de Calibración
     function setupCalibCamera(videoId, canvasId, requiredAction) {
       const vid = document.getElementById(videoId);
       const cnv = document.getElementById(canvasId);
@@ -262,7 +255,6 @@
           const gst = clasificarGesto(lm);
           const isCorrect = gst.action === requiredAction;
 
-          // Rojo si no hace el gesto, Verde si lo logra
           ctx.strokeStyle = isCorrect ? "#22c55e" : "#ef4444";
           ctx.lineWidth = 4;
           for (const [s, e] of HAND_CONNECTIONS) {
@@ -291,34 +283,36 @@
       cam.start();
     }
 
-    // ==========================================
-    // 5 FORMAS EXACTAS (Gota, Corazón, Flor, Nube, Hueso)
-    // ==========================================
+    // =========================================================
+    // MATEMÁTICA UNIFICADA: DIBUJO Y EVALUACIÓN 100% IDÉNTICOS
+    // =========================================================
     function getRadiusTarget(theta, lvl) {
-      if (lvl === 1) { // 1. Gota
+      if (lvl === 1) { // 1. GOTA (Punta arriba, base ancha abajo)
         const t = theta + Math.PI / 2;
-        return 0.85 * (1 + 0.45 * Math.sin(t / 2));
-      } else if (lvl === 2) { // 2. Corazón
+        return 0.90 * (1 - 0.45 * Math.sin(t));
+      } else if (lvl === 2) { // 2. CORAZÓN (Hendidura superior)
         const t = theta + Math.PI / 2;
         const x = 16 * Math.pow(Math.sin(t), 3);
         const y = 13 * Math.cos(t) - 5 * Math.cos(2*t) - 2 * Math.cos(3*t) - Math.cos(4*t);
         return (Math.hypot(x, y) / 16) * 1.05;
-      } else if (lvl === 3) { // 3. Flor de 5 pétalos
-        return 0.90 + 0.40 * Math.cos(5 * theta);
-      } else if (lvl === 4) { // 4. Nube (base plana)
-        const t = theta;
-        if (t < -0.2 && t > -Math.PI + 0.2) return 0.65; // Base aplanada
-        return 0.90 + 0.35 * Math.sin(3 * t);
-      } else { // 5. Hueso (estrechamiento central y 4 lóbulos)
-        return 0.90 + 0.45 * Math.abs(Math.cos(2 * theta)) - 0.25 * Math.abs(Math.sin(2 * theta));
+      } else if (lvl === 3) { // 3. FLOR (5 pétalos)
+        return 0.88 + 0.38 * Math.cos(5 * theta);
+      } else if (lvl === 4) { // 4. NUBE (Corregida: 3 cúmulos arriba, base aplanada)
+        // theta = -PI/2 es abajo (base plana)
+        if (Math.sin(theta) < -0.2) {
+          // Borde inferior plano
+          return 0.62 / Math.max(0.35, Math.abs(Math.sin(theta)));
+        }
+        // Cúmulos superiores
+        return 0.95 + 0.30 * Math.sin(3 * theta) + 0.12 * Math.cos(6 * theta);
+      } else { // 5. HUESO (Adelgazamiento central + 4 lóbulos)
+        const cos2 = Math.cos(2 * theta);
+        return 0.95 + 0.40 * Math.abs(cos2) - 0.22 * Math.abs(Math.sin(2 * theta));
       }
     }
 
-    const nombresFormas = ["", "💧 Gota", "❤️ Corazón", "🌸 Flor (5 Pétalos)", "☁️ Nube", "🦴 Hueso"];
+    const nombresFormas = ["", "💧 Gota", "❤️ Corazón", "🌸 Flor", "☁️ Nube", "🦴 Hueso"];
 
-    // ==========================================
-    // JUEGO ACTIVO (Three.js + MediaPipe + MQTT)
-    // ==========================================
     function iniciarJuegoAR() {
       gameActive = true;
       const vid = document.getElementById("webcam");
@@ -355,6 +349,7 @@
       const doughMesh = new THREE.Mesh(geometry, material);
       scene.add(doughMesh);
 
+      // Dibuja la silueta usando exactamente la misma función matemática getRadiusTarget
       function dibujarSiluetaAltoContraste(w, h) {
         const cx = w / 2;
         const cy = h / 2;
@@ -423,7 +418,7 @@
           const y = pos.getY(i);
           const rActual = Math.hypot(x, y);
 
-          if (rActual > 0.50) {
+          if (rActual > 0.45) {
             const theta = Math.atan2(y, x);
             const rTarget = getRadiusTarget(theta, currentLevel);
             totalDiff += Math.abs(rActual - rTarget);
@@ -432,7 +427,8 @@
         }
 
         const err = count > 0 ? totalDiff / count : 1;
-        currentMatch = Math.max(0, Math.min(100, Math.round((1 - err / 0.50) * 100)));
+        // Tolerancia calibrada para que al calzar visualmente alcance 75%-90%
+        currentMatch = Math.max(0, Math.min(100, Math.round((1 - err / 0.42) * 100)));
         document.getElementById("lblMatch").innerText = currentMatch + "%";
 
         if (currentMatch >= 70) {
@@ -468,7 +464,6 @@
         }, 1500);
       }
 
-      // Transmisión Telemetría a la Pantalla Central
       setInterval(() => {
         if (client.connected) {
           client.publish(TOPIC_TELEMETRY, JSON.stringify({
@@ -520,7 +515,6 @@
               lastDeformTime[h] = now;
               deformarMasaFirme(hitPos3D, gst.action === "push" ? 0.32 : 0.48, gst.force, gst.action);
 
-              // Registrar evento gestual para analítica cada 400ms
               if (now - lastActionTime > 400) {
                 lastActionTime = now;
                 client.publish(TOPIC_GESTURES, JSON.stringify({
