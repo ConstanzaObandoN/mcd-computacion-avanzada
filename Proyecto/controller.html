@@ -113,7 +113,7 @@
     </div>
   </div>
 
-  <!-- PASO 5: JUEGO ACTIVO -->
+  <!-- PASO 5: JUEGO ACTIVO (3 NIVELES) -->
   <div id="screenGame" class="screen" style="padding:0;">
     <div id="viewport">
       <video id="webcam" playsinline muted></video>
@@ -134,7 +134,7 @@
     <div id="panelGame">
       <div style="display:flex; justify-content:space-between; font-size:12px;">
         <span>Corredor: <strong id="lblPlayerId"></strong></span>
-        <span>Meta: <strong>&gt;70%</strong></span>
+        <span>Meta: <strong id="lblTargetReq" style="color:#22c55e;">90%</strong></span>
       </div>
       <div class="gesture-badge" id="lblCurrentAction">✋ Esperando manos...</div>
       <div style="font-size:11px; color:#94a3b8; text-align:center;">
@@ -162,8 +162,10 @@
     let gameActive = false;
     let activeCalibCam = null;
 
-    const SVG_FILES = ["", "gota.svg", "corazon.svg", "flor.svg", "hueso.svg", "estrella.svg"];
-    const NOMBRES_NIVELES = ["", "💧 Gota", "❤️ Corazón", "🌸 Flor", "🦴 Hueso", "⭐ Estrella"];
+    // 3 Niveles con metas escalonadas
+    const SVG_FILES = ["", "gota.svg", "corazon.svg", "flor.svg"];
+    const NOMBRES_NIVELES = ["", "💧 Gota", "❤️ Corazón", "🌸 Flor"];
+    const TARGET_REQUIREMENTS = { 1: 90, 2: 80, 3: 70 };
 
     let currentTargetPoints = [];
 
@@ -287,7 +289,7 @@
     }
 
     // =========================================================
-    // JUEGO AR ACTIVO (THREE.JS + MEDIA-PIPE + SVG HYBRID LOADER)
+    // JUEGO AR ACTIVO (3 NIVELES)
     // =========================================================
     function iniciarJuegoAR() {
       gameActive = true;
@@ -309,7 +311,6 @@
       dirLight.position.set(3, 5, 4);
       scene.add(dirLight);
 
-      // Masa
       const R_BASE = 0.80;
       const geometry = new THREE.CylinderGeometry(R_BASE, R_BASE, 0.20, 90, 8, false);
       geometry.rotateX(Math.PI / 2);
@@ -329,7 +330,6 @@
       let currentSvgLine = null;
       const svgLoader = new THREE.SVGLoader();
 
-      // Siluetas Spline de respaldo garantizado
       const SPLINE_FALLBACKS = {
         1: [ // 1. Gota
           new THREE.Vector2(0, 1.35),
@@ -355,27 +355,6 @@
           new THREE.Vector2(0.75, -1.15), new THREE.Vector2(0.00, -0.55),
           new THREE.Vector2(-0.75, -1.15), new THREE.Vector2(-0.55, -0.15),
           new THREE.Vector2(-1.20, 0.40), new THREE.Vector2(-0.35, 0.40)
-        ],
-        4: [ // 4. Hueso
-          new THREE.Vector2(0, 0.45),
-          new THREE.Vector2(0.85, 0.55),
-          new THREE.Vector2(1.30, 0.95),
-          new THREE.Vector2(1.45, 0.00),
-          new THREE.Vector2(1.30, -0.95),
-          new THREE.Vector2(0.85, -0.55),
-          new THREE.Vector2(0, -0.45),
-          new THREE.Vector2(-0.85, -0.55),
-          new THREE.Vector2(-1.30, -0.95),
-          new THREE.Vector2(-1.45, 0.00),
-          new THREE.Vector2(-1.30, 0.95),
-          new THREE.Vector2(-0.85, 0.55)
-        ],
-        5: [ // 5. Estrella
-          new THREE.Vector2(0.00, 1.35), new THREE.Vector2(0.35, 0.45),
-          new THREE.Vector2(1.30, 0.45), new THREE.Vector2(0.55, -0.15),
-          new THREE.Vector2(0.80, -1.15), new THREE.Vector2(0.00, -0.55),
-          new THREE.Vector2(-0.80, -1.15), new THREE.Vector2(-0.55, -0.15),
-          new THREE.Vector2(-1.30, 0.45), new THREE.Vector2(-0.35, 0.45)
         ]
       };
 
@@ -401,7 +380,9 @@
         currentSvgLine = new THREE.LineLoop(lineGeo, lineMat);
         scene.add(currentSvgLine);
 
+        const req = TARGET_REQUIREMENTS[currentLevel] || 70;
         document.getElementById("lblLevelName").innerText = `Nivel ${currentLevel}: ${NOMBRES_NIVELES[currentLevel]}`;
+        document.getElementById("lblTargetReq").innerText = `${req}%`;
       }
 
       function aplicarSplineFallback(lvl) {
@@ -412,7 +393,7 @@
       }
 
       function cargarSVGNivel(lvl) {
-        if (lvl > 5) return;
+        if (lvl > 3) return;
         const filename = SVG_FILES[lvl];
 
         const rutas = [
@@ -522,10 +503,12 @@
         }
 
         const err = count > 0 ? totalDiff / count : 1;
-        currentMatch = Math.max(0, Math.min(100, Math.round((1 - err / 0.42) * 100)));
+        // Escala calibrada para permitir llegar al 90% en nivel 1 con buena precisión
+        currentMatch = Math.max(0, Math.min(100, Math.round((1 - err / 0.36) * 100)));
         document.getElementById("lblMatch").innerText = currentMatch + "%";
 
-        if (currentMatch >= 70) {
+        const req = TARGET_REQUIREMENTS[currentLevel] || 70;
+        if (currentMatch >= req) {
           avanzarNivel();
         }
       }
@@ -548,8 +531,9 @@
         setTimeout(() => {
           alertBox.style.display = "none";
           currentLevel++;
-          if (currentLevel > 5) {
+          if (currentLevel > 3) {
             document.getElementById("lblLevelName").innerText = "🏆 ¡META ALCANZADA!";
+            document.getElementById("lblTargetReq").innerText = "¡GANASTE!";
           } else {
             resetMasa();
             cargarSVGNivel(currentLevel);

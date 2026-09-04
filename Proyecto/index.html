@@ -5,50 +5,25 @@
   <title>Carrera de Destreza - Pantalla Central</title>
   <style>
     body {
-      margin: 0;
-      overflow: hidden;
-      background: #fdfbf7;
-      color: #0f172a;
-      font-family: system-ui, -apple-system, sans-serif;
-      display: flex;
-      width: 100vw;
-      height: 100vh;
+      margin: 0; overflow: hidden; background: #fdfbf7; color: #0f172a;
+      font-family: system-ui, -apple-system, sans-serif; display: flex; width: 100vw; height: 100vh;
     }
 
     #mainView {
-      flex: 1;
-      height: 100vh;
-      display: flex;
-      flex-direction: column;
-      position: relative;
-      transition: all 0.3s ease;
+      flex: 1; height: 100vh; display: flex; flex-direction: column;
+      position: relative; transition: all 0.3s ease;
     }
 
     header {
-      padding: 12px 20px;
-      display: flex;
-      justify-content: flex-end;
-      align-items: center;
-      gap: 12px;
-      position: absolute;
-      top: 0;
-      right: 0;
-      z-index: 10;
-      background: rgba(255, 255, 255, 0.85);
-      backdrop-filter: blur(6px);
-      border-bottom-left-radius: 12px;
-      border-left: 1px solid #e2e8f0;
-      border-bottom: 1px solid #e2e8f0;
+      padding: 12px 20px; display: flex; justify-content: flex-end; align-items: center;
+      gap: 12px; position: absolute; top: 0; right: 0; z-index: 10;
+      background: rgba(255, 255, 255, 0.88); backdrop-filter: blur(8px);
+      border-bottom-left-radius: 14px; border-left: 1px solid #e2e8f0; border-bottom: 1px solid #e2e8f0;
     }
 
     button {
-      border: none;
-      border-radius: 8px;
-      padding: 9px 15px;
-      font-weight: 800;
-      cursor: pointer;
-      font-size: 13px;
-      transition: transform 0.1s, background 0.2s;
+      border: none; border-radius: 8px; padding: 9px 15px; font-weight: 800;
+      cursor: pointer; font-size: 13px; transition: transform 0.1s, background 0.2s;
     }
     button:active { transform: scale(0.96); }
     .btn-start { background: #22c55e; color: white; }
@@ -57,64 +32,66 @@
     .btn-export { background: #0ea5e9; color: white; }
 
     #trackContainer {
-      flex: 1;
-      width: 100%;
-      height: 100%;
-      position: relative;
-    }
-    canvas#trackCanvas {
-      width: 100%;
-      height: 100%;
-      display: block;
+      flex: 1; width: 100%; height: 100%; position: relative;
+      background-color: #72cf53;
+      background-image: url('./Asset/pista_2.png'), url('./assets/pista_2.png'), url('pista_2.png');
+      background-size: 100% 100%;
+      background-repeat: no-repeat;
     }
 
-    /* Panel Lateral de Analítica */
-    #analyticsDrawer {
-      width: 0;
-      height: 100vh;
-      background: #0f172a;
-      color: #f8fafc;
-      overflow-y: auto;
-      transition: width 0.3s ease;
-      box-sizing: border-box;
+    /* Cronómetro posicionado exactamente sobre el recuadro verde superior */
+    #timerBox {
+      position: absolute;
+      top: 3.2%;
+      left: 2.2%;
+      width: 22%;
+      height: 12.8%;
       display: flex;
       flex-direction: column;
-      box-shadow: -4px 0 25px rgba(0,0,0,0.3);
+      justify-content: center;
+      align-items: center;
+      z-index: 5;
+      pointer-events: none;
     }
-    #analyticsDrawer.open {
-      width: 420px;
-      padding: 24px 20px;
-    }
+    #timerLabel { font-size: 11px; font-weight: 900; color: #14532d; letter-spacing: 1px; }
+    #timerValue { font-size: 38px; font-weight: 900; color: #052e16; font-family: ui-monospace, monospace; line-height: 1; }
 
-    .drawer-title { font-size: 18px; font-weight: 800; color: #38bdf8; margin-bottom: 12px; }
-    .stat-card {
-      background: #1e293b;
-      border-radius: 8px;
-      padding: 12px;
-      margin-bottom: 12px;
-      border: 1px solid #334155;
-      font-size: 12px;
+    canvas#trackCanvas { width: 100%; height: 100%; display: block; background: transparent; }
+
+    /* Panel Lateral de Analítica Avanzada */
+    #analyticsDrawer {
+      width: 0; height: 100vh; background: #0b0f19; color: #f8fafc;
+      overflow-y: auto; transition: width 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+      box-sizing: border-box; display: flex; flex-direction: column;
+      box-shadow: -6px 0 30px rgba(0,0,0,0.5);
     }
-    .stat-card h4 { margin: 0 0 6px 0; color: #facc15; font-size: 13px; }
+    #analyticsDrawer.open { width: 490px; padding: 24px 20px; }
+
+    .drawer-title { font-size: 20px; font-weight: 900; color: #38bdf8; margin-bottom: 14px; display: flex; align-items: center; justify-content: space-between; }
+    
+    .card {
+      background: #1e293b; border-radius: 10px; padding: 14px; margin-bottom: 14px;
+      border: 1px solid #334155; font-size: 12px;
+    }
+    .card h4 { margin: 0 0 10px 0; color: #facc15; font-size: 12px; text-transform: uppercase; letter-spacing: 0.5px; }
+
+    .kpi-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin-bottom: 6px; }
+    .kpi-cell { background: #0f172a; padding: 8px 10px; border-radius: 6px; border: 1px solid #334155; }
+    .kpi-title { color: #94a3b8; font-size: 10px; text-transform: uppercase; }
+    .kpi-val { font-size: 16px; font-weight: 800; color: #38bdf8; margin-top: 2px; }
+
+    .table-strategy { width: 100%; border-collapse: collapse; text-align: center; font-size: 11px; margin-top: 4px; }
+    .table-strategy th { background: #0f172a; color: #94a3b8; padding: 6px 4px; border: 1px solid #334155; }
+    .table-strategy td { padding: 6px 4px; border: 1px solid #334155; font-weight: bold; }
+
     .log-box {
-      max-height: 180px;
-      overflow-y: auto;
-      background: #0b0f19;
-      padding: 8px;
-      border-radius: 6px;
-      font-family: monospace;
-      font-size: 11px;
+      max-height: 150px; overflow-y: auto; background: #030712; padding: 8px 10px;
+      border-radius: 6px; font-family: ui-monospace, monospace; font-size: 11px; border: 1px solid #1e293b;
     }
 
     #countdownOverlay {
-      position: absolute;
-      inset: 0;
-      background: rgba(15, 23, 42, 0.88);
-      display: none;
-      justify-content: center;
-      align-items: center;
-      flex-direction: column;
-      z-index: 50;
+      position: absolute; inset: 0; background: rgba(15, 23, 42, 0.88);
+      display: none; justify-content: center; align-items: center; flex-direction: column; z-index: 50;
     }
     #countText { font-size: 110px; font-weight: 900; color: #f97316; }
   </style>
@@ -135,27 +112,96 @@
     </header>
 
     <div id="trackContainer">
+      <div id="timerBox">
+        <div id="timerLabel">TIEMPO TRANSCURRIDO</div>
+        <div id="timerValue">00:00.0</div>
+      </div>
       <canvas id="trackCanvas"></canvas>
     </div>
   </div>
 
+  <!-- PANEL LATERAL DE ANALÍTICA -->
   <div id="analyticsDrawer">
-    <div class="drawer-title">📈 Telemetría Experimental</div>
-
-    <div class="stat-card">
-      <h4>Matriz Gestual Acumulada</h4>
-      <div>Total Pinzas (Estirar): <strong id="totalPinches" style="color:#38bdf8;">0</strong></div>
-      <div>Total Poking (Hundir): <strong id="totalPushes" style="color:#ef4444;">0</strong></div>
-      <div>Ratio Pinza / Hundir: <strong id="ratioPinchPush">0.0</strong></div>
+    <div class="drawer-title">
+      <span>📈 Métricas Experimentales</span>
+      <button onclick="toggleDrawer()" style="background:transparent; color:#94a3b8; font-size:16px; padding:2px 8px;">✕</button>
     </div>
 
-    <div class="stat-card">
-      <h4>Progreso de Corredores</h4>
-      <div id="drawerRacersList">Esperando participantes...</div>
+    <!-- 1. RESUMEN GLOBAL / KPIS -->
+    <div class="card">
+      <h4>Rendimiento Cinemático Global</h4>
+      <div class="kpi-grid">
+        <div class="kpi-cell">
+          <div class="kpi-title">Pinzas (Estirar)</div>
+          <div class="kpi-val" id="totalPinches" style="color:#38bdf8;">0</div>
+        </div>
+        <div class="kpi-cell">
+          <div class="kpi-title">Poking (Hundir)</div>
+          <div class="kpi-val" id="totalPushes" style="color:#ef4444;">0</div>
+        </div>
+        <div class="kpi-cell">
+          <div class="kpi-title">Ratio Gestual</div>
+          <div class="kpi-val" id="ratioPinchPush">0.00</div>
+        </div>
+        <div class="kpi-cell">
+          <div class="kpi-title">Cadencia Media</div>
+          <div class="kpi-val" id="cadenceVal">0 g/min</div>
+        </div>
+      </div>
     </div>
 
-    <div class="stat-card" style="flex:1;">
-      <h4>Registro Cronológico</h4>
+    <!-- 2. MATRIZ DE ESTRATEGIA POR SILUETA (3 NIVELES) -->
+    <div class="card">
+      <h4>Matriz de Estrategia por Silueta</h4>
+      <table class="table-strategy">
+        <thead>
+          <tr>
+            <th>Silueta</th>
+            <th>Exigencia</th>
+            <th>Pinzas</th>
+            <th>Poking</th>
+            <th>Ratio</th>
+            <th>T. Prom</th>
+          </tr>
+        </thead>
+        <tbody id="matrixBody">
+          <tr>
+            <td>1. Gota</td>
+            <td style="color:#22c55e;">90%</td>
+            <td id="m_p1">0</td>
+            <td id="m_u1">0</td>
+            <td id="m_r1">--</td>
+            <td id="m_t1">--</td>
+          </tr>
+          <tr>
+            <td>2. Corazón</td>
+            <td style="color:#22c55e;">80%</td>
+            <td id="m_p2">0</td>
+            <td id="m_u2">0</td>
+            <td id="m_r2">--</td>
+            <td id="m_t2">--</td>
+          </tr>
+          <tr>
+            <td>3. Flor</td>
+            <td style="color:#22c55e;">70%</td>
+            <td id="m_p3">0</td>
+            <td id="m_u3">0</td>
+            <td id="m_r3">--</td>
+            <td id="m_t3">--</td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+
+    <!-- 3. DETALLE POR COMPETIDOR -->
+    <div class="card">
+      <h4>Estado de Corredores</h4>
+      <div id="racersDetailList">Esperando conexión de móviles...</div>
+    </div>
+
+    <!-- 4. LOG TEMPORAL CRONOLÓGICO -->
+    <div class="card" style="flex:1;">
+      <h4>Registro Temporal Detallado</h4>
       <div class="log-box" id="eventLog"></div>
     </div>
   </div>
@@ -165,22 +211,26 @@
     const TOPIC_GESTURES  = "mcd/dom/gestures_log";
     const TOPIC_CONTROL   = "mcd/dom/game_control";
 
+    const TARGET_REQUIREMENTS = { 1: 90, 2: 80, 3: 70 };
+
     const racers = new Map();
     const telemetryHistory = [];
 
     let totalPinches = 0;
     let totalPushes = 0;
 
+    const stageStats = {
+      1: { pinches: 0, pushes: 0, times: [] },
+      2: { pinches: 0, pushes: 0, times: [] },
+      3: { pinches: 0, pushes: 0, times: [] }
+    };
+
+    let raceStartTime = null;
+    let timerInterval = null;
+
     const trackCanvas = document.getElementById("trackCanvas");
     const ctx = trackCanvas.getContext("2d");
 
-    // Cargar Imágenes Personalizadas
-    const bgImg = new Image();
-    bgImg.src = "Assets/pista.png";
-
-    const runnerImg = new Image();
-    runnerImg.src = "Assets/runner.png";
-//
     function resizeTrack() {
       trackCanvas.width = trackCanvas.clientWidth;
       trackCanvas.height = trackCanvas.clientHeight;
@@ -188,7 +238,27 @@
     window.addEventListener("resize", resizeTrack);
     resizeTrack();
 
-    // MQTT EMQX
+    // Cronómetro
+    function updateTimer() {
+      if (!raceStartTime) return;
+      const elapsed = Date.now() - raceStartTime;
+      const mins = Math.floor(elapsed / 60000);
+      const secs = Math.floor((elapsed % 60000) / 1000);
+      const tenths = Math.floor((elapsed % 1000) / 100);
+
+      const mStr = String(mins).padStart(2, '0');
+      const sStr = String(secs).padStart(2, '0');
+      document.getElementById("timerValue").innerText = `${mStr}:${sStr}.${tenths}`;
+
+      // Calcular cadencia global (gestos / minuto)
+      const elapsedMin = elapsed / 60000;
+      if (elapsedMin > 0.05) {
+        const cpm = Math.round((totalPinches + totalPushes) / elapsedMin);
+        document.getElementById("cadenceVal").innerText = `${cpm} g/min`;
+      }
+    }
+
+    // Conexión MQTT
     const client = mqtt.connect("wss://broker.emqx.io:8084/mqtt", {
       clientId: "host_screen_" + Math.random().toString(16).substring(2, 6),
       clean: true
@@ -209,41 +279,63 @@
               color: data.color || "#3b82f6",
               level: data.level || 1,
               match: data.match || 0,
-              lane: racers.size,
               pinches: 0,
               pushes: 0,
+              stageStart: Date.now(),
+              stageTimes: {},
               lastSeen: Date.now()
             });
           }
           const r = racers.get(data.id);
+
+          // Cambio de nivel y registro de tiempo de resolución
+          if (data.level > r.level && r.level <= 3) {
+            const durationSec = ((Date.now() - r.stageStart) / 1000).toFixed(1);
+            r.stageTimes[r.level] = durationSec;
+            if (stageStats[r.level]) stageStats[r.level].times.push(parseFloat(durationSec));
+            r.stageStart = Date.now();
+          }
+
           r.level = data.level;
           r.match = data.match;
           r.color = data.color || r.color;
           r.lastSeen = Date.now();
+          actualizarMetricasUI();
         }
 
         if (topic === TOPIC_GESTURES) {
-          if (data.action === "pull") totalPinches++;
-          if (data.action === "push") totalPushes++;
+          const act = data.action;
+          const lvl = Math.min(3, Math.max(1, data.level || 1));
+
+          if (act === "pull") {
+            totalPinches++;
+            if (stageStats[lvl]) stageStats[lvl].pinches++;
+          } else if (act === "push") {
+            totalPushes++;
+            if (stageStats[lvl]) stageStats[lvl].pushes++;
+          }
 
           if (racers.has(data.userId)) {
             const r = racers.get(data.userId);
-            if (data.action === "pull") r.pinches++;
-            if (data.action === "push") r.pushes++;
+            if (act === "pull") r.pinches++;
+            if (act === "push") r.pushes++;
           }
 
           telemetryHistory.push({
             timestamp: new Date().toISOString(),
             userId: data.userId,
             color: data.color,
-            level: data.level,
-            action: data.action,
+            level: lvl,
+            action: act,
             match: data.match
           });
 
+          // Log de eventos
           const log = document.getElementById("eventLog");
           const item = document.createElement("div");
-          item.innerText = `[${new Date().toLocaleTimeString()}] ${data.userId}: ${data.action} (L${data.level})`;
+          const colorDot = `<span style="color:${data.color}">●</span>`;
+          const actText = act === "pull" ? "🤏 Pinza" : "☝️ Poking";
+          item.innerHTML = `[${new Date().toLocaleTimeString()}] ${colorDot} <strong>${data.userId}</strong>: ${actText} (Nivel ${lvl} - ${data.match}%)`;
           log.prepend(item);
 
           actualizarMetricasUI();
@@ -251,92 +343,105 @@
       } catch (e) {}
     });
 
-    // Función para tintar dinámicamente runner.png con el color elegido
-    const runnerColorCache = new Map();
-    function getTintedRunner(color) {
-      if (runnerColorCache.has(color)) return runnerColorCache.get(color);
+    // Dibujo Vectorial del Corredor
+    function dibujarCorredorVectorial(c, x, y, size, color) {
+      c.save();
+      c.translate(x, y);
 
-      const offCanvas = document.createElement("canvas");
-      offCanvas.width = runnerImg.width || 120;
-      offCanvas.height = runnerImg.height || 120;
-      const offCtx = offCanvas.getContext("2d");
+      const s = size * 0.45;
+      c.strokeStyle = color;
+      c.fillStyle = color;
+      c.lineWidth = Math.max(2.5, s * 0.18);
+      c.lineCap = "round";
+      c.lineJoin = "round";
 
-      // Dibujar silueta original
-      offCtx.drawImage(runnerImg, 0, 0, offCanvas.width, offCanvas.height);
-      // Aplicar tinte del color
-      offCtx.globalCompositeOperation = "source-in";
-      offCtx.fillStyle = color;
-      offCtx.fillRect(0, 0, offCanvas.width, offCanvas.height);
+      // Cabeza
+      c.beginPath();
+      c.arc(s * 0.15, -s * 0.85, s * 0.22, 0, Math.PI * 2);
+      c.fill();
 
-      runnerColorCache.set(color, offCanvas);
-      return offCanvas;
+      // Torso
+      c.beginPath();
+      c.moveTo(s * 0.05, -s * 0.60);
+      c.lineTo(s * 0.25, -s * 0.10);
+      c.stroke();
+
+      // Brazos
+      c.beginPath();
+      c.moveTo(s * 0.08, -s * 0.50);
+      c.lineTo(-s * 0.35, -s * 0.30);
+      c.lineTo(-s * 0.55, -s * 0.15);
+      c.stroke();
+
+      c.beginPath();
+      c.moveTo(s * 0.10, -s * 0.50);
+      c.lineTo(s * 0.45, -s * 0.35);
+      c.lineTo(s * 0.35, -s * 0.10);
+      c.stroke();
+
+      // Piernas
+      c.beginPath();
+      c.moveTo(s * 0.25, -s * 0.10);
+      c.lineTo(s * 0.65, s * 0.25);
+      c.lineTo(s * 0.45, s * 0.70);
+      c.stroke();
+
+      c.beginPath();
+      c.moveTo(s * 0.25, -s * 0.10);
+      c.lineTo(-s * 0.20, s * 0.25);
+      c.lineTo(-s * 0.65, s * 0.50);
+      c.stroke();
+
+      c.restore();
     }
 
-    // Bucle de Renderizado de la Pista
+    // Render de Pista (3 Etapas alineadas a pista_2.png)
     function renderTrack() {
       const w = trackCanvas.width;
       const h = trackCanvas.height;
 
-      // 1. Dibujar Imagen de Fondo de la Pista
-      if (bgImg.complete && bgImg.naturalWidth > 0) {
-        ctx.drawImage(bgImg, 0, 0, w, h);
-      } else {
-        ctx.fillStyle = "#fba94b";
-        ctx.fillRect(0, 0, w, h);
-      }
+      ctx.clearRect(0, 0, w, h);
 
-      // Parámetros geométricos alineados con pista.png:
-      // La pista tiene 8 carriles en la franja inferior (aproximadamente desde el 38% del alto hasta el 100%)
+      // Franja de carriles (desde el 38% del alto)
       const topOffset = h * 0.38;
       const trackAreaH = h - topOffset;
       const numLanes = 8;
       const laneH = trackAreaH / numLanes;
 
-      // Las 5 líneas de etapa en pista.png están distribuidas proporcionalmente
-      // Salida: ~12.5% del ancho | Meta final: ~94.5% del ancho
+      // Coordenadas horizontales de las 3 etapas
+      // Salida: ~12.5% | Línea Nivel 2: ~54.2% | Meta final: ~96.2%
       const startX = w * 0.02;
-      const goalX = w * 0.945;
+      const goalX  = w * 0.942;
       const totalDist = goalX - startX;
-      const stageDist = totalDist / 5;
+      const stageDist = totalDist / 3;
 
-      // 2. Dibujar Corredores usando runner.png
       let laneIdx = 0;
       for (const [id, r] of racers.entries()) {
         const assignedLane = laneIdx % numLanes;
         const laneCenterY = topOffset + (assignedLane + 0.5) * laneH;
 
-        // Calcular posición X del corredor (Nivel 1..5 y avance de 0 a 70%)
-        const completedStagesDist = (r.level - 1) * stageDist;
-        const currentStageDist = (Math.min(r.match, 70) / 70) * stageDist;
-        const runnerX = Math.min(goalX, startX + completedStagesDist + currentStageDist);
+        // Meta requerida por nivel actual
+        const targetReq = TARGET_REQUIREMENTS[r.level] || 70;
+
+        // Progreso dentro de las 3 etapas
+        const completedDist = (Math.min(3, r.level) - 1) * stageDist;
+        const intraDist = r.level > 3 ? stageDist : (Math.min(r.match, targetReq) / targetReq) * stageDist;
+        const runnerX = Math.min(goalX, startX + completedDist + intraDist);
 
         const runnerSize = laneH * 0.85;
-        const runnerY = laneCenterY - runnerSize / 2;
 
-        if (runnerImg.complete && runnerImg.naturalWidth > 0) {
-          const tinted = getTintedRunner(r.color);
-          ctx.drawImage(tinted, runnerX - runnerSize * 0.4, runnerY, runnerSize, runnerSize);
-        } else {
-          // Fallback círculo si la imagen aún carga
-          ctx.beginPath();
-          ctx.arc(runnerX, laneCenterY, 14, 0, Math.PI * 2);
-          ctx.fillStyle = r.color;
-          ctx.fill();
-        }
+        dibujarCorredorVectorial(ctx, runnerX, laneCenterY, runnerSize, r.color);
 
-        // Nombre y porcentaje
         ctx.fillStyle = "#0f172a";
         ctx.font = "bold 11px system-ui";
-        ctx.fillText(`${r.id} (L${r.level}: ${r.match}%)`, runnerX - 15, runnerY - 4);
+        const txtLevel = r.level > 3 ? "🏆 META" : `L${r.level}: ${r.match}% / ${targetReq}%`;
+        ctx.fillText(`${r.id} (${txtLevel})`, runnerX - 22, laneCenterY - runnerSize * 0.45);
 
         laneIdx++;
       }
 
       requestAnimationFrame(renderTrack);
     }
-
-    bgImg.onload = () => requestAnimationFrame(renderTrack);
-    runnerImg.onload = () => requestAnimationFrame(renderTrack);
     requestAnimationFrame(renderTrack);
 
     function toggleDrawer() {
@@ -349,11 +454,42 @@
       const ratio = totalPushes > 0 ? (totalPinches / totalPushes).toFixed(2) : totalPinches;
       document.getElementById("ratioPinchPush").innerText = ratio;
 
+      // Matriz por Forma (3 Niveles)
+      for (let s = 1; s <= 3; s++) {
+        const p = stageStats[s].pinches;
+        const u = stageStats[s].pushes;
+        const r = u > 0 ? (p / u).toFixed(2) : (p > 0 ? p : "--");
+        const avgT = stageStats[s].times.length > 0
+          ? (stageStats[s].times.reduce((a, b) => a + b, 0) / stageStats[s].times.length).toFixed(1) + "s"
+          : "--";
+
+        document.getElementById(`m_p${s}`).innerText = p;
+        document.getElementById(`m_u${s}`).innerText = u;
+        document.getElementById(`m_r${s}`).innerText = r;
+        document.getElementById(`m_t${s}`).innerText = avgT;
+      }
+
+      // Detalle por Corredor
       let html = "";
       for (const [id, r] of racers.entries()) {
-        html += `<div><strong>${r.id}</strong> (<span style="color:${r.color}">●</span>): ${r.pinches} Pinzas | ${r.pushes} Poking | Nivel ${r.level}</div>`;
+        const userTotal = r.pinches + r.pushes;
+        const userRatio = r.pushes > 0 ? (r.pinches / r.pushes).toFixed(2) : "--";
+        const currentReq = TARGET_REQUIREMENTS[r.level] || 70;
+        const statusText = r.level > 3 ? "🏆 ¡COMPLETADO!" : `Nivel ${r.level} (${r.match}% / ${currentReq}%)`;
+
+        html += `
+          <div style="margin-bottom:10px; background:#0f172a; border:1px solid #334155; padding:8px 10px; border-radius:6px;">
+            <div style="display:flex; justify-content:space-between; align-items:center;">
+              <span><span style="color:${r.color}; font-size:14px;">●</span> <strong>${r.id}</strong></span>
+              <span style="color:#facc15; font-weight:bold; font-size:11px;">${statusText}</span>
+            </div>
+            <div style="color:#94a3b8; font-size:10px; margin-top:4px;">
+              Gestos: ${userTotal} (🤏 ${r.pinches} | ☝️ ${r.pushes}) | Ratio: ${userRatio}
+            </div>
+          </div>
+        `;
       }
-      document.getElementById("drawerRacersList").innerHTML = html || "Esperando participantes...";
+      document.getElementById("racersDetailList").innerHTML = html || "Esperando datos...";
     }
 
     function iniciarCarrera() {
@@ -370,6 +506,10 @@
           txt.innerText = count;
         } else if (count === 0) {
           txt.innerText = "¡MOLDEEN!";
+          raceStartTime = Date.now();
+          if (timerInterval) clearInterval(timerInterval);
+          timerInterval = setInterval(updateTimer, 100);
+
           client.publish(TOPIC_CONTROL, JSON.stringify({ action: "START_RACE" }));
         } else {
           clearInterval(timer);
@@ -391,7 +531,7 @@
       const encodedUri = encodeURI(csvContent);
       const link = document.createElement("a");
       link.setAttribute("href", encodedUri);
-      link.setAttribute("download", `telemetria_carrera_${Date.now()}.csv`);
+      link.setAttribute("download", `telemetria_destreza_3niveles_${Date.now()}.csv`);
       document.body.appendChild(link);
       link.click();
       document.body.removeChild(link);
