@@ -48,7 +48,7 @@
 
     #panelGame {
       position: absolute; bottom: 0; left: 0; right: 0; height: 25vh;
-      background: #ffffff; border-top: 2px solid #e2e8f0; padding: 12px;
+      background: #ffffff; border-top: 2px solid #e2e8f0; padding: 10px 14px;
       box-sizing: border-box; display: flex; flex-direction: column; justify-content: space-between;
     }
     .gesture-badge { font-weight: bold; font-size: 13px; text-align: center; }
@@ -57,6 +57,11 @@
       position: absolute; top: 40%; left: 10%; right: 10%; z-index: 30;
       background: #22c55e; color: #022c22; padding: 14px; border-radius: 12px;
       text-align: center; font-size: 20px; font-weight: 900; display: none;
+    }
+
+    .btn-resign {
+      background: #ef4444; color: white; border: none; padding: 6px 12px;
+      border-radius: 6px; font-size: 11px; font-weight: bold; cursor: pointer;
     }
   </style>
 
@@ -113,7 +118,7 @@
     </div>
   </div>
 
-  <!-- PASO 5: JUEGO ACTIVO (3 NIVELES) -->
+  <!-- PASO 5: JUEGO ACTIVO -->
   <div id="screenGame" class="screen" style="padding:0;">
     <div id="viewport">
       <video id="webcam" playsinline muted></video>
@@ -132,9 +137,10 @@
     </div>
 
     <div id="panelGame">
-      <div style="display:flex; justify-content:space-between; font-size:12px;">
-        <span>Corredor: <strong id="lblPlayerId"></strong></span>
-        <span>Meta: <strong id="lblTargetReq" style="color:#22c55e;">90%</strong></span>
+      <div style="display:flex; justify-content:space-between; align-items:center;">
+        <div>Corredor: <strong id="lblPlayerId"></strong></div>
+        <div>Meta: <strong id="lblTargetReq" style="color:#22c55e;">90%</strong></div>
+        <button class="btn-resign" onclick="rendirse()">🏳️ Rendirse</button>
       </div>
       <div class="gesture-badge" id="lblCurrentAction">✋ Esperando manos...</div>
       <div style="font-size:11px; color:#94a3b8; text-align:center;">
@@ -160,16 +166,16 @@
     let currentLevel = 1;
     let currentMatch = 0;
     let gameActive = false;
+    let userStatus = "running";
     let activeCalibCam = null;
 
-    // 3 Niveles con metas escalonadas
+    // 3 Niveles con exigencia alta
     const SVG_FILES = ["", "gota.svg", "corazon.svg", "flor.svg"];
     const NOMBRES_NIVELES = ["", "💧 Gota", "❤️ Corazón", "🌸 Flor"];
-    const TARGET_REQUIREMENTS = { 1: 90, 2: 80, 3: 70 };
+    const TARGET_REQUIREMENTS = { 1: 90, 2: 85, 3: 80 };
 
     let currentTargetPoints = [];
 
-    // Selector de Color
     const colorGrid = document.getElementById("colorGrid");
     COLORS.forEach(c => {
       const dot = document.createElement("div");
@@ -199,7 +205,7 @@
       } else if (step === 4) {
         document.getElementById("screenLobby").classList.add("active");
         document.getElementById("lobbyAvatar").style.background = selectedColor;
-        client.publish(TOPIC_TELEMETRY, JSON.stringify({ id: USER_ID, color: selectedColor, level: 1, match: 0 }));
+        client.publish(TOPIC_TELEMETRY, JSON.stringify({ id: USER_ID, color: selectedColor, level: 1, match: 0, status: "running" }));
       } else if (step === 5) {
         document.getElementById("screenGame").classList.add("active");
         document.getElementById("lblPlayerId").innerText = USER_ID;
@@ -208,15 +214,33 @@
       }
     }
 
-    // MQTT
     const client = mqtt.connect("wss://broker.emqx.io:8084/mqtt", { clientId: USER_ID, clean: true });
     client.on("connect", () => client.subscribe(TOPIC_CONTROL));
     client.on("message", (topic, message) => {
       try {
         const cmd = JSON.parse(message.toString());
         if (cmd.action === "START_RACE") goToStep(5);
+        if (cmd.action === "END_GAME") {
+          gameActive = false;
+          alert("🏁 ¡La carrera ha concluido! Mira los resultados en la pantalla central.");
+        }
       } catch (e) {}
     });
+
+    function rendirse() {
+      if (confirm("¿Segur@ que deseas rendirte en este nivel?")) {
+        userStatus = "resigned";
+        gameActive = false;
+        client.publish(TOPIC_TELEMETRY, JSON.stringify({
+          id: USER_ID,
+          color: selectedColor,
+          level: currentLevel,
+          match: currentMatch,
+          status: "resigned"
+        }));
+        document.getElementById("lblCurrentAction").innerText = "🏳️ Te has rendido.";
+      }
+    }
 
     const HAND_CONNECTIONS = [
       [0,1],[1,2],[2,3],[3,4],[0,5],[5,6],[6,7],[7,8],
@@ -288,9 +312,6 @@
       activeCalibCam.start();
     }
 
-    // =========================================================
-    // JUEGO AR ACTIVO (3 NIVELES)
-    // =========================================================
     function iniciarJuegoAR() {
       gameActive = true;
       const vid = document.getElementById("webcam");
@@ -331,25 +352,18 @@
       const svgLoader = new THREE.SVGLoader();
 
       const SPLINE_FALLBACKS = {
-        1: [ // 1. Gota
-          new THREE.Vector2(0, 1.35),
-          new THREE.Vector2(0.55, 0.50),
-          new THREE.Vector2(0.95, -0.40),
-          new THREE.Vector2(0, -1.15),
-          new THREE.Vector2(-0.95, -0.40),
-          new THREE.Vector2(-0.55, 0.50)
+        1: [
+          new THREE.Vector2(0, 1.35), new THREE.Vector2(0.55, 0.50),
+          new THREE.Vector2(0.95, -0.40), new THREE.Vector2(0, -1.15),
+          new THREE.Vector2(-0.95, -0.40), new THREE.Vector2(-0.55, 0.50)
         ],
-        2: [ // 2. Corazón
-          new THREE.Vector2(0, 0.45),
-          new THREE.Vector2(0.65, 1.15),
-          new THREE.Vector2(1.15, 0.65),
-          new THREE.Vector2(0.85, -0.20),
-          new THREE.Vector2(0, -1.25),
-          new THREE.Vector2(-0.85, -0.20),
-          new THREE.Vector2(-1.15, 0.65),
-          new THREE.Vector2(-0.65, 1.15)
+        2: [
+          new THREE.Vector2(0, 0.45), new THREE.Vector2(0.65, 1.15),
+          new THREE.Vector2(1.15, 0.65), new THREE.Vector2(0.85, -0.20),
+          new THREE.Vector2(0, -1.25), new THREE.Vector2(-0.85, -0.20),
+          new THREE.Vector2(-1.15, 0.65), new THREE.Vector2(-0.65, 1.15)
         ],
-        3: [ // 3. Flor
+        3: [
           new THREE.Vector2(0.00, 1.25), new THREE.Vector2(0.35, 0.40),
           new THREE.Vector2(1.20, 0.40), new THREE.Vector2(0.55, -0.15),
           new THREE.Vector2(0.75, -1.15), new THREE.Vector2(0.00, -0.55),
@@ -380,7 +394,7 @@
         currentSvgLine = new THREE.LineLoop(lineGeo, lineMat);
         scene.add(currentSvgLine);
 
-        const req = TARGET_REQUIREMENTS[currentLevel] || 70;
+        const req = TARGET_REQUIREMENTS[currentLevel] || 80;
         document.getElementById("lblLevelName").innerText = `Nivel ${currentLevel}: ${NOMBRES_NIVELES[currentLevel]}`;
         document.getElementById("lblTargetReq").innerText = `${req}%`;
       }
@@ -397,10 +411,11 @@
         const filename = SVG_FILES[lvl];
 
         const rutas = [
-          `Asset/${filename}`,
           `Assets/${filename}`,
-          `./Asset/${filename}`,
+          `Asset/${filename}`,
           `./Assets/${filename}`,
+          `./Asset/${filename}`,
+          `assets/${filename}`,
           filename
         ];
 
@@ -445,7 +460,7 @@
       cargarSVGNivel(1);
 
       function deformarMasaFirme(hit, brushRadius, fuerza, action) {
-        if (!hit || fuerza <= 0 || action === "idle" || !gameActive) return;
+        if (!hit || fuerza <= 0 || action === "idle" || !gameActive || userStatus !== "running") return;
 
         const pos = geometry.attributes.position;
         const direccion = action === "pull" ? 1 : -1;
@@ -473,7 +488,7 @@
       }
 
       function evaluarProgresoSVG() {
-        if (!currentTargetPoints || currentTargetPoints.length === 0) return;
+        if (!currentTargetPoints || currentTargetPoints.length === 0 || userStatus !== "running") return;
 
         const pos = geometry.attributes.position;
         let totalDiff = 0;
@@ -503,11 +518,10 @@
         }
 
         const err = count > 0 ? totalDiff / count : 1;
-        // Escala calibrada para permitir llegar al 90% en nivel 1 con buena precisión
-        currentMatch = Math.max(0, Math.min(100, Math.round((1 - err / 0.36) * 100)));
+        currentMatch = Math.max(0, Math.min(100, Math.round((1 - err / 0.34) * 100)));
         document.getElementById("lblMatch").innerText = currentMatch + "%";
 
-        const req = TARGET_REQUIREMENTS[currentLevel] || 70;
+        const req = TARGET_REQUIREMENTS[currentLevel] || 80;
         if (currentMatch >= req) {
           avanzarNivel();
         }
@@ -532,8 +546,16 @@
           alertBox.style.display = "none";
           currentLevel++;
           if (currentLevel > 3) {
+            userStatus = "finished";
             document.getElementById("lblLevelName").innerText = "🏆 ¡META ALCANZADA!";
             document.getElementById("lblTargetReq").innerText = "¡GANASTE!";
+            client.publish(TOPIC_TELEMETRY, JSON.stringify({
+              id: USER_ID,
+              color: selectedColor,
+              level: 4,
+              match: 100,
+              status: "finished"
+            }));
           } else {
             resetMasa();
             cargarSVGNivel(currentLevel);
@@ -548,7 +570,8 @@
             id: USER_ID,
             color: selectedColor,
             level: currentLevel,
-            match: currentMatch
+            match: currentMatch,
+            status: userStatus
           }));
         }
       }, 250);
@@ -566,7 +589,7 @@
         const count = res.multiHandLandmarks ? res.multiHandLandmarks.length : 0;
         const now = Date.now();
 
-        if (count > 0) {
+        if (count > 0 && userStatus === "running") {
           for (let h = 0; h < count; h++) {
             const lm = res.multiHandLandmarks[h];
             const gst = clasificarGesto(lm);
@@ -604,6 +627,8 @@
               }
             }
           }
+        } else if (userStatus !== "running") {
+          document.getElementById("lblCurrentAction").innerText = userStatus === "finished" ? "🏆 Carrera Completada" : "🏳️ Carrera Terminada";
         } else {
           document.getElementById("lblCurrentAction").innerText = "✋ Esperando manos...";
         }

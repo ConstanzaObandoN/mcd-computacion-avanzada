@@ -28,18 +28,19 @@
     button:active { transform: scale(0.96); }
     .btn-start { background: #22c55e; color: white; }
     .btn-start:hover { background: #16a34a; }
+    .btn-stop { background: #ef4444; color: white; }
+    .btn-stop:hover { background: #dc2626; }
     .btn-analytics { background: #6366f1; color: white; }
     .btn-export { background: #0ea5e9; color: white; }
 
     #trackContainer {
       flex: 1; width: 100%; height: 100%; position: relative;
       background-color: #72cf53;
-      background-image: url('./Asset/pista_2.png'), url('./Asssets/pista_2.png'), url('pista_2.png');
+      background-image: url('./Assets/pista_2.png'), url('Assets/pista_2.png'), url('./assets/pista_2.png'), url('pista_2.png');
       background-size: 100% 100%;
       background-repeat: no-repeat;
     }
 
-    /* Cronómetro posicionado exactamente sobre el recuadro verde superior */
     #timerBox {
       position: absolute;
       top: 3.2%;
@@ -58,7 +59,25 @@
 
     canvas#trackCanvas { width: 100%; height: 100%; display: block; background: transparent; }
 
-    /* Panel Lateral de Analítica Avanzada */
+    /* Podio Final Overlay */
+    #podiumOverlay {
+      position: absolute; inset: 0; background: rgba(15, 23, 42, 0.94);
+      display: none; justify-content: center; align-items: center; flex-direction: column;
+      z-index: 60; color: white;
+    }
+    #podiumCard {
+      background: #1e293b; border: 2px solid #38bdf8; border-radius: 16px;
+      padding: 30px 40px; text-align: center; max-width: 520px; width: 90%;
+      box-shadow: 0 10px 40px rgba(0,0,0,0.8);
+    }
+    .podium-title { font-size: 28px; font-weight: 900; color: #facc15; margin-bottom: 20px; }
+    .podium-list { display: flex; flex-direction: column; gap: 12px; margin-bottom: 24px; text-align: left; }
+    .podium-row {
+      display: flex; justify-content: space-between; align-items: center;
+      background: #0f172a; padding: 10px 16px; border-radius: 8px; border: 1px solid #334155;
+    }
+
+    /* Panel Lateral de Analítica */
     #analyticsDrawer {
       width: 0; height: 100vh; background: #0b0f19; color: #f8fafc;
       overflow-y: auto; transition: width 0.3s cubic-bezier(0.4, 0, 0.2, 1);
@@ -105,8 +124,21 @@
       <div style="font-size: 24px; color: white; font-weight: bold;">¡A sus marcas!</div>
     </div>
 
+    <!-- PANTALLA PODIO FINAL -->
+    <div id="podiumOverlay">
+      <div id="podiumCard">
+        <div class="podium-title">🏆 CARRERA FINALIZADA</div>
+        <div class="podium-list" id="podiumList"></div>
+        <div style="display:flex; gap:10px; justify-content:center;">
+          <button class="btn-analytics" onclick="toggleDrawer(); document.getElementById('podiumOverlay').style.display='none';">📊 Ver Telemetría Completa</button>
+          <button class="btn-export" onclick="exportarCSV()">📥 Descargar CSV</button>
+        </div>
+      </div>
+    </div>
+
     <header>
       <button class="btn-start" onclick="iniciarCarrera()">🏁 Dar Salida</button>
+      <button class="btn-stop" onclick="finalizarCarreraManual()">🛑 Cerrar Carrera</button>
       <button class="btn-analytics" onclick="toggleDrawer()">📊 Ver Análisis</button>
       <button class="btn-export" onclick="exportarCSV()">📥 Descargar CSV</button>
     </header>
@@ -120,14 +152,12 @@
     </div>
   </div>
 
-  <!-- PANEL LATERAL DE ANALÍTICA -->
   <div id="analyticsDrawer">
     <div class="drawer-title">
       <span>📈 Métricas Experimentales</span>
       <button onclick="toggleDrawer()" style="background:transparent; color:#94a3b8; font-size:16px; padding:2px 8px;">✕</button>
     </div>
 
-    <!-- 1. RESUMEN GLOBAL / KPIS -->
     <div class="card">
       <h4>Rendimiento Cinemático Global</h4>
       <div class="kpi-grid">
@@ -150,7 +180,6 @@
       </div>
     </div>
 
-    <!-- 2. MATRIZ DE ESTRATEGIA POR SILUETA (3 NIVELES) -->
     <div class="card">
       <h4>Matriz de Estrategia por Silueta</h4>
       <table class="table-strategy">
@@ -175,7 +204,7 @@
           </tr>
           <tr>
             <td>2. Corazón</td>
-            <td style="color:#22c55e;">80%</td>
+            <td style="color:#22c55e;">85%</td>
             <td id="m_p2">0</td>
             <td id="m_u2">0</td>
             <td id="m_r2">--</td>
@@ -183,7 +212,7 @@
           </tr>
           <tr>
             <td>3. Flor</td>
-            <td style="color:#22c55e;">70%</td>
+            <td style="color:#22c55e;">80%</td>
             <td id="m_p3">0</td>
             <td id="m_u3">0</td>
             <td id="m_r3">--</td>
@@ -193,13 +222,11 @@
       </table>
     </div>
 
-    <!-- 3. DETALLE POR COMPETIDOR -->
     <div class="card">
       <h4>Estado de Corredores</h4>
       <div id="racersDetailList">Esperando conexión de móviles...</div>
     </div>
 
-    <!-- 4. LOG TEMPORAL CRONOLÓGICO -->
     <div class="card" style="flex:1;">
       <h4>Registro Temporal Detallado</h4>
       <div class="log-box" id="eventLog"></div>
@@ -211,13 +238,14 @@
     const TOPIC_GESTURES  = "mcd/dom/gestures_log";
     const TOPIC_CONTROL   = "mcd/dom/game_control";
 
-    const TARGET_REQUIREMENTS = { 1: 90, 2: 80, 3: 70 };
+    const TARGET_REQUIREMENTS = { 1: 90, 2: 85, 3: 80 };
 
     const racers = new Map();
     const telemetryHistory = [];
 
     let totalPinches = 0;
     let totalPushes = 0;
+    let carreraTerminada = false;
 
     const stageStats = {
       1: { pinches: 0, pushes: 0, times: [] },
@@ -231,6 +259,11 @@
     const trackCanvas = document.getElementById("trackCanvas");
     const ctx = trackCanvas.getContext("2d");
 
+    // Cargar la imagen runner.png de tu carpeta Assets
+    const runnerImg = new Image();
+    runnerImg.src = "./Assets/runner.png";
+    runnerImg.onerror = () => { runnerImg.src = "Assets/runner.png"; };
+
     function resizeTrack() {
       trackCanvas.width = trackCanvas.clientWidth;
       trackCanvas.height = trackCanvas.clientHeight;
@@ -238,9 +271,8 @@
     window.addEventListener("resize", resizeTrack);
     resizeTrack();
 
-    // Cronómetro
     function updateTimer() {
-      if (!raceStartTime) return;
+      if (!raceStartTime || carreraTerminada) return;
       const elapsed = Date.now() - raceStartTime;
       const mins = Math.floor(elapsed / 60000);
       const secs = Math.floor((elapsed % 60000) / 1000);
@@ -250,7 +282,6 @@
       const sStr = String(secs).padStart(2, '0');
       document.getElementById("timerValue").innerText = `${mStr}:${sStr}.${tenths}`;
 
-      // Calcular cadencia global (gestos / minuto)
       const elapsedMin = elapsed / 60000;
       if (elapsedMin > 0.05) {
         const cpm = Math.round((totalPinches + totalPushes) / elapsedMin);
@@ -258,7 +289,6 @@
       }
     }
 
-    // Conexión MQTT
     const client = mqtt.connect("wss://broker.emqx.io:8084/mqtt", {
       clientId: "host_screen_" + Math.random().toString(16).substring(2, 6),
       clean: true
@@ -281,6 +311,8 @@
               match: data.match || 0,
               pinches: 0,
               pushes: 0,
+              status: "running", // running | finished | resigned
+              finalTime: null,
               stageStart: Date.now(),
               stageTimes: {},
               lastSeen: Date.now()
@@ -288,7 +320,11 @@
           }
           const r = racers.get(data.id);
 
-          // Cambio de nivel y registro de tiempo de resolución
+          if (data.status === "resigned") {
+            r.status = "resigned";
+          }
+
+          // Avanzó de nivel
           if (data.level > r.level && r.level <= 3) {
             const durationSec = ((Date.now() - r.stageStart) / 1000).toFixed(1);
             r.stageTimes[r.level] = durationSec;
@@ -296,10 +332,19 @@
             r.stageStart = Date.now();
           }
 
+          // Llegó a la meta final (Nivel > 3)
+          if (data.level > 3 && r.status === "running") {
+            r.status = "finished";
+            const elapsed = Date.now() - raceStartTime;
+            r.finalTime = (elapsed / 1000).toFixed(1) + "s";
+          }
+
           r.level = data.level;
           r.match = data.match;
           r.color = data.color || r.color;
           r.lastSeen = Date.now();
+
+          verificarFinDeCarrera();
           actualizarMetricasUI();
         }
 
@@ -330,7 +375,6 @@
             match: data.match
           });
 
-          // Log de eventos
           const log = document.getElementById("eventLog");
           const item = document.createElement("div");
           const colorDot = `<span style="color:${data.color}">●</span>`;
@@ -343,73 +387,56 @@
       } catch (e) {}
     });
 
-    // Dibujo Vectorial del Corredor
-    function dibujarCorredorVectorial(c, x, y, size, color) {
-      c.save();
-      c.translate(x, y);
+    // Tintar runner.png sin pintar el fondo blanco
+    const runnerCache = new Map();
+    function getTintedRunner(color) {
+      if (runnerCache.has(color)) return runnerCache.get(color);
 
-      const s = size * 0.45;
-      c.strokeStyle = color;
-      c.fillStyle = color;
-      c.lineWidth = Math.max(2.5, s * 0.18);
-      c.lineCap = "round";
-      c.lineJoin = "round";
+      const off = document.createElement("canvas");
+      off.width = runnerImg.width || 100;
+      off.height = runnerImg.height || 100;
+      const oCtx = off.getContext("2d");
 
-      // Cabeza
-      c.beginPath();
-      c.arc(s * 0.15, -s * 0.85, s * 0.22, 0, Math.PI * 2);
-      c.fill();
+      oCtx.drawImage(runnerImg, 0, 0, off.width, off.height);
+      const imgData = oCtx.getImageData(0, 0, off.width, off.height);
+      const d = imgData.data;
 
-      // Torso
-      c.beginPath();
-      c.moveTo(s * 0.05, -s * 0.60);
-      c.lineTo(s * 0.25, -s * 0.10);
-      c.stroke();
+      // Obtener componentes RGB del color
+      const dummy = document.createElement("div");
+      dummy.style.color = color;
+      document.body.appendChild(dummy);
+      const rgbStr = getComputedStyle(dummy).color;
+      document.body.removeChild(dummy);
+      const m = rgbStr.match(/\d+/g) || [59, 130, 246];
+      const [rC, gC, bC] = m.map(Number);
 
-      // Brazos
-      c.beginPath();
-      c.moveTo(s * 0.08, -s * 0.50);
-      c.lineTo(-s * 0.35, -s * 0.30);
-      c.lineTo(-s * 0.55, -s * 0.15);
-      c.stroke();
-
-      c.beginPath();
-      c.moveTo(s * 0.10, -s * 0.50);
-      c.lineTo(s * 0.45, -s * 0.35);
-      c.lineTo(s * 0.35, -s * 0.10);
-      c.stroke();
-
-      // Piernas
-      c.beginPath();
-      c.moveTo(s * 0.25, -s * 0.10);
-      c.lineTo(s * 0.65, s * 0.25);
-      c.lineTo(s * 0.45, s * 0.70);
-      c.stroke();
-
-      c.beginPath();
-      c.moveTo(s * 0.25, -s * 0.10);
-      c.lineTo(-s * 0.20, s * 0.25);
-      c.lineTo(-s * 0.65, s * 0.50);
-      c.stroke();
-
-      c.restore();
+      // Reemplazar píxeles no blancos por el color elegido
+      for (let i = 0; i < d.length; i += 4) {
+        const isWhite = d[i] > 230 && d[i+1] > 230 && d[i+2] > 230;
+        if (isWhite || d[i+3] < 20) {
+          d[i+3] = 0; // Transparente
+        } else {
+          d[i] = rC;
+          d[i+1] = gC;
+          d[i+2] = bC;
+        }
+      }
+      oCtx.putImageData(imgData, 0, 0);
+      runnerCache.set(color, off);
+      return off;
     }
 
-    // Render de Pista (3 Etapas alineadas a pista_2.png)
     function renderTrack() {
       const w = trackCanvas.width;
       const h = trackCanvas.height;
 
       ctx.clearRect(0, 0, w, h);
 
-      // Franja de carriles (desde el 38% del alto)
       const topOffset = h * 0.38;
       const trackAreaH = h - topOffset;
       const numLanes = 8;
       const laneH = trackAreaH / numLanes;
 
-      // Coordenadas horizontales de las 3 etapas
-      // Salida: ~12.5% | Línea Nivel 2: ~54.2% | Meta final: ~96.2%
       const startX = w * 0.02;
       const goalX  = w * 0.942;
       const totalDist = goalX - startX;
@@ -420,22 +447,31 @@
         const assignedLane = laneIdx % numLanes;
         const laneCenterY = topOffset + (assignedLane + 0.5) * laneH;
 
-        // Meta requerida por nivel actual
-        const targetReq = TARGET_REQUIREMENTS[r.level] || 70;
-
-        // Progreso dentro de las 3 etapas
+        const targetReq = TARGET_REQUIREMENTS[r.level] || 80;
         const completedDist = (Math.min(3, r.level) - 1) * stageDist;
         const intraDist = r.level > 3 ? stageDist : (Math.min(r.match, targetReq) / targetReq) * stageDist;
         const runnerX = Math.min(goalX, startX + completedDist + intraDist);
 
-        const runnerSize = laneH * 0.85;
+        const runnerSize = laneH * 0.90;
+        const runnerY = laneCenterY - runnerSize / 2;
 
-        dibujarCorredorVectorial(ctx, runnerX, laneCenterY, runnerSize, r.color);
+        if (runnerImg.complete && runnerImg.naturalWidth > 0) {
+          const tinted = getTintedRunner(r.color);
+          ctx.drawImage(tinted, runnerX - runnerSize * 0.4, runnerY, runnerSize, runnerSize);
+        } else {
+          ctx.beginPath();
+          ctx.arc(runnerX, laneCenterY, 14, 0, Math.PI * 2);
+          ctx.fillStyle = r.color;
+          ctx.fill();
+        }
 
         ctx.fillStyle = "#0f172a";
         ctx.font = "bold 11px system-ui";
-        const txtLevel = r.level > 3 ? "🏆 META" : `L${r.level}: ${r.match}% / ${targetReq}%`;
-        ctx.fillText(`${r.id} (${txtLevel})`, runnerX - 22, laneCenterY - runnerSize * 0.45);
+        let txtStatus = `L${r.level}: ${r.match}%`;
+        if (r.status === "finished") txtStatus = `🏆 META (${r.finalTime})`;
+        if (r.status === "resigned") txtStatus = `🏳️ Rendid@`;
+
+        ctx.fillText(`${r.id} (${txtStatus})`, runnerX - 20, runnerY - 3);
 
         laneIdx++;
       }
@@ -443,6 +479,54 @@
       requestAnimationFrame(renderTrack);
     }
     requestAnimationFrame(renderTrack);
+
+    function verificarFinDeCarrera() {
+      if (racers.size === 0 || carreraTerminada || !raceStartTime) return;
+
+      const todosListos = Array.from(racers.values()).every(r => r.status === "finished" || r.status === "resigned");
+      if (todosListos) {
+        mostrarPodio();
+      }
+    }
+
+    function finalizarCarreraManual() {
+      mostrarPodio();
+    }
+
+    function mostrarPodio() {
+      carreraTerminada = true;
+      clearInterval(timerInterval);
+
+      client.publish(TOPIC_CONTROL, JSON.stringify({ action: "END_GAME" }));
+
+      // Ordenar: primero los que llegaron a la meta por tiempo, luego los demás por nivel y match
+      const clasificacion = Array.from(racers.values()).sort((a, b) => {
+        if (a.status === "finished" && b.status === "finished") {
+          return parseFloat(a.finalTime) - parseFloat(b.finalTime);
+        }
+        if (a.status === "finished") return -1;
+        if (b.status === "finished") return 1;
+        if (b.level !== a.level) return b.level - a.level;
+        return b.match - a.match;
+      });
+
+      let html = "";
+      clasificacion.forEach((r, idx) => {
+        const medallas = ["🥇", "🥈", "🥉"];
+        const medalla = medallas[idx] || `#${idx + 1}`;
+        const tiempoStr = r.finalTime ? `⏱️ ${r.finalTime}` : (r.status === "resigned" ? "🏳️ Rendid@" : `Nivel ${r.level} (${r.match}%)`);
+
+        html += `
+          <div class="podium-row">
+            <span><strong>${medalla}</strong> <span style="color:${r.color}; font-size:16px;">●</span> <strong>${r.id}</strong></span>
+            <span style="color:#facc15; font-weight:bold;">${tiempoStr}</span>
+          </div>
+        `;
+      });
+
+      document.getElementById("podiumList").innerHTML = html || "No hubo competidores.";
+      document.getElementById("podiumOverlay").style.display = "flex";
+    }
 
     function toggleDrawer() {
       document.getElementById("analyticsDrawer").classList.toggle("open");
@@ -454,7 +538,6 @@
       const ratio = totalPushes > 0 ? (totalPinches / totalPushes).toFixed(2) : totalPinches;
       document.getElementById("ratioPinchPush").innerText = ratio;
 
-      // Matriz por Forma (3 Niveles)
       for (let s = 1; s <= 3; s++) {
         const p = stageStats[s].pinches;
         const u = stageStats[s].pushes;
@@ -469,13 +552,12 @@
         document.getElementById(`m_t${s}`).innerText = avgT;
       }
 
-      // Detalle por Corredor
       let html = "";
       for (const [id, r] of racers.entries()) {
         const userTotal = r.pinches + r.pushes;
         const userRatio = r.pushes > 0 ? (r.pinches / r.pushes).toFixed(2) : "--";
-        const currentReq = TARGET_REQUIREMENTS[r.level] || 70;
-        const statusText = r.level > 3 ? "🏆 ¡COMPLETADO!" : `Nivel ${r.level} (${r.match}% / ${currentReq}%)`;
+        const currentReq = TARGET_REQUIREMENTS[r.level] || 80;
+        const statusText = r.status === "finished" ? "🏆 META" : (r.status === "resigned" ? "🏳️ Rendid@" : `Nivel ${r.level} (${r.match}% / ${currentReq}%)`);
 
         html += `
           <div style="margin-bottom:10px; background:#0f172a; border:1px solid #334155; padding:8px 10px; border-radius:6px;">
@@ -493,6 +575,8 @@
     }
 
     function iniciarCarrera() {
+      carreraTerminada = false;
+      document.getElementById("podiumOverlay").style.display = "none";
       const overlay = document.getElementById("countdownOverlay");
       const txt = document.getElementById("countText");
       overlay.style.display = "flex";
@@ -531,7 +615,7 @@
       const encodedUri = encodeURI(csvContent);
       const link = document.createElement("a");
       link.setAttribute("href", encodedUri);
-      link.setAttribute("download", `telemetria_destreza_3niveles_${Date.now()}.csv`);
+      link.setAttribute("download", `telemetria_destreza_${Date.now()}.csv`);
       document.body.appendChild(link);
       link.click();
       document.body.removeChild(link);
