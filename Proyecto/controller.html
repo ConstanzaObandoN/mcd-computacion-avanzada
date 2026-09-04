@@ -60,10 +60,8 @@
     }
   </style>
 
-  <!-- Three.js + SVGLoader Oficial compatible con r128 -->
   <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/loaders/SVGLoader.js"></script>
-  
   <script src="https://cdn.jsdelivr.net/npm/@mediapipe/camera_utils/camera_utils.js" crossorigin="anonymous"></script>
   <script src="https://cdn.jsdelivr.net/npm/@mediapipe/hands/hands.js" crossorigin="anonymous"></script>
   <script src="https://unpkg.com/mqtt/dist/mqtt.min.js"></script>
@@ -164,18 +162,9 @@
     let gameActive = false;
     let activeCalibCam = null;
 
-    // Archivos SVG exactos en tu carpeta
-    const SVG_FILES = [
-      "",
-      "gota.svg",
-      "corazon.svg",
-      "flor.svg",
-      "hueso.svg",
-      "estrella.svg"
-    ];
+    const SVG_FILES = ["", "gota.svg", "corazon.svg", "flor.svg", "hueso.svg", "estrella.svg"];
     const NOMBRES_NIVELES = ["", "💧 Gota", "❤️ Corazón", "🌸 Flor", "🦴 Hueso", "⭐ Estrella"];
 
-    // Puntos del SVG actual cargado
     let currentTargetPoints = [];
 
     // Selector de Color
@@ -298,7 +287,7 @@
     }
 
     // =========================================================
-    // JUEGO PRINCIPAL CON THREE.JS + SVGLOADER
+    // JUEGO AR ACTIVO (THREE.JS + MEDIA-PIPE + SVG HYBRID LOADER)
     // =========================================================
     function iniciarJuegoAR() {
       gameActive = true;
@@ -320,7 +309,7 @@
       dirLight.position.set(3, 5, 4);
       scene.add(dirLight);
 
-      // Masa Three.js
+      // Masa
       const R_BASE = 0.80;
       const geometry = new THREE.CylinderGeometry(R_BASE, R_BASE, 0.20, 90, 8, false);
       geometry.rotateX(Math.PI / 2);
@@ -337,74 +326,143 @@
       const doughMesh = new THREE.Mesh(geometry, material);
       scene.add(doughMesh);
 
-      // Contenedor visual del SVG en 3D
       let currentSvgLine = null;
       const svgLoader = new THREE.SVGLoader();
 
-      // Función con reintentos para soportar Asset/ o assets/
+      // Siluetas Spline de respaldo garantizado
+      const SPLINE_FALLBACKS = {
+        1: [ // 1. Gota
+          new THREE.Vector2(0, 1.35),
+          new THREE.Vector2(0.55, 0.50),
+          new THREE.Vector2(0.95, -0.40),
+          new THREE.Vector2(0, -1.15),
+          new THREE.Vector2(-0.95, -0.40),
+          new THREE.Vector2(-0.55, 0.50)
+        ],
+        2: [ // 2. Corazón
+          new THREE.Vector2(0, 0.45),
+          new THREE.Vector2(0.65, 1.15),
+          new THREE.Vector2(1.15, 0.65),
+          new THREE.Vector2(0.85, -0.20),
+          new THREE.Vector2(0, -1.25),
+          new THREE.Vector2(-0.85, -0.20),
+          new THREE.Vector2(-1.15, 0.65),
+          new THREE.Vector2(-0.65, 1.15)
+        ],
+        3: [ // 3. Flor
+          new THREE.Vector2(0.00, 1.25), new THREE.Vector2(0.35, 0.40),
+          new THREE.Vector2(1.20, 0.40), new THREE.Vector2(0.55, -0.15),
+          new THREE.Vector2(0.75, -1.15), new THREE.Vector2(0.00, -0.55),
+          new THREE.Vector2(-0.75, -1.15), new THREE.Vector2(-0.55, -0.15),
+          new THREE.Vector2(-1.20, 0.40), new THREE.Vector2(-0.35, 0.40)
+        ],
+        4: [ // 4. Hueso
+          new THREE.Vector2(0, 0.45),
+          new THREE.Vector2(0.85, 0.55),
+          new THREE.Vector2(1.30, 0.95),
+          new THREE.Vector2(1.45, 0.00),
+          new THREE.Vector2(1.30, -0.95),
+          new THREE.Vector2(0.85, -0.55),
+          new THREE.Vector2(0, -0.45),
+          new THREE.Vector2(-0.85, -0.55),
+          new THREE.Vector2(-1.30, -0.95),
+          new THREE.Vector2(-1.45, 0.00),
+          new THREE.Vector2(-1.30, 0.95),
+          new THREE.Vector2(-0.85, 0.55)
+        ],
+        5: [ // 5. Estrella
+          new THREE.Vector2(0.00, 1.35), new THREE.Vector2(0.35, 0.45),
+          new THREE.Vector2(1.30, 0.45), new THREE.Vector2(0.55, -0.15),
+          new THREE.Vector2(0.80, -1.15), new THREE.Vector2(0.00, -0.55),
+          new THREE.Vector2(-0.80, -1.15), new THREE.Vector2(-0.55, -0.15),
+          new THREE.Vector2(-1.30, 0.45), new THREE.Vector2(-0.35, 0.45)
+        ]
+      };
+
+      function aplicarPuntosEnEscena(rawPoints) {
+        if (currentSvgLine) scene.remove(currentSvgLine);
+
+        const box = new THREE.Box2().setFromPoints(rawPoints);
+        const center = box.getCenter(new THREE.Vector2());
+        const size = box.getSize(new THREE.Vector2());
+        const maxDim = Math.max(size.x, size.y) || 1;
+        const scale = 2.4 / maxDim;
+
+        const centeredPts3D = [];
+        currentTargetPoints = rawPoints.map(p => {
+          const nx = (p.x - center.x) * scale;
+          const ny = (p.y - center.y) * scale;
+          centeredPts3D.push(new THREE.Vector3(nx, ny, 0.12));
+          return { x: nx, y: ny, r: Math.hypot(nx, ny), theta: Math.atan2(ny, nx) };
+        });
+
+        const lineGeo = new THREE.BufferGeometry().setFromPoints(centeredPts3D);
+        const lineMat = new THREE.LineBasicMaterial({ color: 0x38bdf8, linewidth: 4 });
+        currentSvgLine = new THREE.LineLoop(lineGeo, lineMat);
+        scene.add(currentSvgLine);
+
+        document.getElementById("lblLevelName").innerText = `Nivel ${currentLevel}: ${NOMBRES_NIVELES[currentLevel]}`;
+      }
+
+      function aplicarSplineFallback(lvl) {
+        const ctrlPts = SPLINE_FALLBACKS[lvl] || SPLINE_FALLBACKS[1];
+        const curve = new THREE.SplineCurve(ctrlPts);
+        const pts = curve.getPoints(140);
+        aplicarPuntosEnEscena(pts);
+      }
+
       function cargarSVGNivel(lvl) {
         if (lvl > 5) return;
         const filename = SVG_FILES[lvl];
-        const rutas = [`Asset/${filename}`, `assets/${filename}`, `./Asset/${filename}`, `./assets/${filename}`];
 
-        function tryLoad(index) {
+        const rutas = [
+          `Asset/${filename}`,
+          `assets/${filename}`,
+          `./Asset/${filename}`,
+          `./assets/${filename}`,
+          filename
+        ];
+
+        let index = 0;
+        function tryLoad() {
           if (index >= rutas.length) {
-            console.error("No se pudo cargar el SVG:", filename);
+            aplicarSplineFallback(lvl);
             return;
           }
+
           svgLoader.load(
             rutas[index],
             (data) => {
-              if (currentSvgLine) scene.remove(currentSvgLine);
-
-              currentTargetPoints = [];
               const rawPoints = [];
-
-              data.paths.forEach((path) => {
-                const shapes = THREE.SVGLoader.createShapes(path);
-                shapes.forEach((shape) => {
-                  const pts = shape.getPoints(120);
-                  pts.forEach(p => rawPoints.push(new THREE.Vector2(p.x, p.y)));
+              if (data.paths && data.paths.length > 0) {
+                data.paths.forEach(path => {
+                  const shapes = THREE.SVGLoader.createShapes(path);
+                  shapes.forEach(sh => {
+                    const pts = sh.getPoints(100);
+                    pts.forEach(p => rawPoints.push(new THREE.Vector2(p.x, -p.y)));
+                  });
                 });
-              });
+              }
 
-              if (rawPoints.length === 0) return;
-
-              // Centrar el SVG en el origen (0,0) y escalar a tamaño adecuado (~2.2 unidades)
-              const box = new THREE.Box2().setFromPoints(rawPoints);
-              const center = box.getCenter(new THREE.Vector2());
-              const size = box.getSize(new THREE.Vector2());
-              const maxDim = Math.max(size.x, size.y) || 1;
-              const scale = 2.3 / maxDim;
-
-              const centeredPts3D = [];
-              currentTargetPoints = rawPoints.map(p => {
-                // Invertir Y porque en SVG +Y baja
-                const nx = (p.x - center.x) * scale;
-                const ny = -(p.y - center.y) * scale;
-                centeredPts3D.push(new THREE.Vector3(nx, ny, 0.12));
-                return { x: nx, y: ny, r: Math.hypot(nx, ny), theta: Math.atan2(ny, nx) };
-              });
-
-              // Crear línea neón 3D fluida
-              const lineGeo = new THREE.BufferGeometry().setFromPoints(centeredPts3D);
-              const lineMat = new THREE.LineBasicMaterial({ color: 0x38bdf8, linewidth: 4 });
-              currentSvgLine = new THREE.LineLoop(lineGeo, lineMat);
-              scene.add(currentSvgLine);
-
-              document.getElementById("lblLevelName").innerText = `Nivel ${lvl}: ${NOMBRESNIVELES[lvl]}`;
+              if (rawPoints.length > 10) {
+                aplicarPuntosEnEscena(rawPoints);
+              } else {
+                aplicarSplineFallback(lvl);
+              }
             },
             undefined,
-            () => tryLoad(index + 1) // Si falla la ruta, prueba la siguiente opción de mayúscula/minúscula
+            () => {
+              index++;
+              tryLoad();
+            }
           );
         }
 
-        tryLoad(0);
+        tryLoad();
       }
 
       cargarSVGNivel(1);
 
-      // Deformación de masa física
       function deformarMasaFirme(hit, brushRadius, fuerza, action) {
         if (!hit || fuerza <= 0 || action === "idle" || !gameActive) return;
 
@@ -433,7 +491,6 @@
         evaluarProgresoSVG();
       }
 
-      // Evaluación del porcentaje comparando la masa contra los vértices exactos del SVG
       function evaluarProgresoSVG() {
         if (!currentTargetPoints || currentTargetPoints.length === 0) return;
 
@@ -449,7 +506,6 @@
           if (rActual > 0.45) {
             const theta = Math.atan2(y, x);
 
-            // Buscar el punto del SVG con ángulo polar más cercano
             let closest = currentTargetPoints[0];
             let minDiffAngle = 999;
             for (let j = 0; j < currentTargetPoints.length; j++) {
@@ -502,7 +558,6 @@
         }, 1500);
       }
 
-      // Telemetría continua a la pantalla central
       setInterval(() => {
         if (client.connected) {
           client.publish(TOPIC_TELEMETRY, JSON.stringify({
@@ -534,7 +589,6 @@
 
             document.getElementById("lblCurrentAction").innerText = gst.label;
 
-            // Esqueleto en Canvas 2D
             uiCtx.strokeStyle = gst.action === "push" ? "#ef4444" : gst.action === "pull" ? "#38bdf8" : "rgba(148, 163, 184, 0.7)";
             uiCtx.lineWidth = 3;
             for (const [s, e] of HAND_CONNECTIONS) {
@@ -544,7 +598,6 @@
               uiCtx.stroke();
             }
 
-            // Coordenadas 3D coincidentes con Three.js
             const hitPos3D = {
               x: Number((-(gst.point.x - 0.5) * 4.6).toFixed(3)),
               y: Number((-(gst.point.y - 0.5) * 5.4).toFixed(3)),
