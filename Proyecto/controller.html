@@ -122,7 +122,7 @@
       <div id="levelBadge">
         <div>
           <div style="font-size: 10px; color: #94a3b8; text-transform: uppercase;">Objetivo Actual</div>
-          <div class="level-title" id="lblLevelName">Nivel 1: Gota</div>
+          <div class="level-title" id="lblLevelName">Nivel 1: 💧 Gota</div>
         </div>
         <div class="match-tag" id="lblMatch">0%</div>
       </div>
@@ -159,6 +159,7 @@
     let currentLevel = 1;
     let currentMatch = 0;
     let gameActive = false;
+    let activeCalibCam = null;
 
     // Selector de Color
     const colorGrid = document.getElementById("colorGrid");
@@ -175,6 +176,12 @@
     });
 
     function goToStep(step) {
+      // Detener cámara previa si existía para liberar el sensor en el móvil
+      if (activeCalibCam) {
+        try { activeCalibCam.stop(); } catch(e) {}
+        activeCalibCam = null;
+      }
+
       document.querySelectorAll(".screen").forEach(s => s.classList.remove("active"));
       if (step === 2) {
         document.getElementById("screenCalibPush").classList.add("active");
@@ -194,7 +201,7 @@
       }
     }
 
-    // MQTT EMQX
+    // Conexión MQTT EMQX
     const client = mqtt.connect("wss://broker.emqx.io:8084/mqtt", {
       clientId: USER_ID,
       clean: true
@@ -272,7 +279,7 @@
         ctx.restore();
       });
 
-      const cam = new Camera(vid, {
+      activeCalibCam = new Camera(vid, {
         onFrame: async () => {
           cnv.width = vid.videoWidth;
           cnv.height = vid.videoHeight;
@@ -280,66 +287,43 @@
         },
         width: 480, height: 480
       });
-      cam.start();
+      activeCalibCam.start();
     }
 
     // =========================================================
-    // MATEMÁTICA UNIFICADA: DIBUJO Y EVALUACIÓN 100% IDÉNTICOS
+    // MATEMÁTICA UNIFICADA Y ORIENTADA (+Y = Arriba)
     // =========================================================
-    // Radios normalizados con orientación correcta (+Y = Arriba, -Y = Abajo)
-function getRadiusTarget(theta, lvl) {
-  // theta va de 0 a 2*PI (0: derecha, PI/2: arriba, PI: izquierda, 3*PI/2: abajo)
-
-  if (lvl === 1) {
-    // 1. GOTA ESBELTA: Base redonda abajo, punta afilada arriba (theta = PI/2)
-    // Se afina progresivamente en el cuadrante superior
-    const sinT = Math.sin(theta);
-    if (sinT > 0) {
-      // Mitad superior: punta cónica estilizada
-      return 0.75 + 0.55 * Math.pow(sinT, 2.2);
-    } else {
-      // Mitad inferior: base globular perfectamente redondeada
-      return 0.75 + 0.10 * Math.abs(sinT);
+    function getRadiusTarget(theta, lvl) {
+      if (lvl === 1) {
+        // 1. GOTA ESBELTA: Punta arriba (+Y), base ancha abajo (-Y)
+        const sinT = Math.sin(theta);
+        if (sinT > 0) {
+          return 0.75 + 0.55 * Math.pow(sinT, 2.2);
+        } else {
+          return 0.75 + 0.10 * Math.abs(sinT);
+        }
+      } else if (lvl === 2) {
+        // 2. CORAZÓN DERECHO: Lóbulos arriba, punta abajo
+        const t = theta - Math.PI / 2;
+        const x = 16 * Math.pow(Math.sin(t), 3);
+        const y = -(13 * Math.cos(t) - 5 * Math.cos(2*t) - 2 * Math.cos(3*t) - Math.cos(4*t));
+        return (Math.hypot(x, y) / 16) * 1.15;
+      } else if (lvl === 3) {
+        // 3. NUBE: Base plana abajo y 3 cúmulos redondos arriba
+        const sinT = Math.sin(theta);
+        if (sinT < -0.2) return 0.65;
+        return 0.85 + 0.35 * Math.sin(3 * theta);
+      } else if (lvl === 4) {
+        // 4. HUESO: Cintura horizontal estrecha, 2 extremos anchos
+        const cos2 = Math.cos(2 * theta);
+        return 0.88 + 0.38 * cos2;
+      } else {
+        // 5. FLOR (5 pétalos)
+        return 0.85 + 0.42 * Math.cos(5 * (theta - Math.PI / 2));
+      }
     }
-  }
 
-  else if (lvl === 2) {
-    // 2. CORAZÓN DERECHO: Lóbulos arriba (PI/2), hendidura central y punta abajo (-PI/2)
-    const t = theta - Math.PI / 2;
-    const x = 16 * Math.pow(Math.sin(t), 3);
-    const y = -(13 * Math.cos(t) - 5 * Math.cos(2*t) - 2 * Math.cos(3*t) - Math.cos(4*t));
-    return (Math.hypot(x, y) / 16) * 1.15;
-  }
-
-  else if (lvl === 3) {
-    // 3. NUBE ESPONJOSA: 3 cúpulas redondeadas arriba y base plana asentada abajo
-    const sinT = Math.sin(theta);
-    const cosT = Math.cos(theta);
-    if (sinT < -0.2) {
-      // Base inferior aplanada y suave
-      return 0.65;
-    } else {
-      // 3 cúmulos convexos bien definidos
-      return 0.85 + 0.35 * Math.sin(3 * theta);
-    }
-  }
-
-  else if (lvl === 4) {
-    // 4. HUESO HORIZONTAL: Cintura estrecha en el centro (arriba/abajo) y extremos anchos (izq/der)
-    // Evita la forma de cruz modulando solo la horizontalidad
-    const cos2 = Math.cos(2 * theta);
-    const radioBase = 0.88;
-    // Ensancha en theta = 0 y PI (lados), adelgaza en PI/2 y 3PI/2 (centro)
-    return radioBase + 0.38 * cos2;
-  }
-
-  else {
-    // 5. FLOR DE 5 PÉTALOS: Simetría radial balanceada y valles profundos
-    return 0.85 + 0.42 * Math.cos(5 * (theta - Math.PI / 2));
-  }
-}
-
-const nombresFormas = ["", "💧 Gota", "❤️ Corazón", "☁️ Nube", "🦴 Hueso", "🌸 Flor"];
+    const nombresFormas = ["", "💧 Gota", "❤️ Corazón", "☁️ Nube", "🦴 Hueso", "🌸 Flor"];
 
     function iniciarJuegoAR() {
       gameActive = true;
@@ -377,7 +361,6 @@ const nombresFormas = ["", "💧 Gota", "❤️ Corazón", "☁️ Nube", "🦴 
       const doughMesh = new THREE.Mesh(geometry, material);
       scene.add(doughMesh);
 
-      // Dibuja la silueta usando exactamente la misma función matemática getRadiusTarget
       function dibujarSiluetaAltoContraste(w, h) {
         const cx = w / 2;
         const cy = h / 2;
@@ -386,49 +369,31 @@ const nombresFormas = ["", "💧 Gota", "❤️ Corazón", "☁️ Nube", "🦴 
         uiCtx.save();
         uiCtx.beginPath();
 
-        // Muestreo paramétrico de 360 grados
         for (let i = 0; i <= 200; i++) {
-            const theta = (i / 200) * Math.PI * 2;
-            const r = getRadiusTarget(theta, currentLevel) * pxScale;
-            
-            // En Canvas 2D: +Y baja, por eso restamos r * sin(theta) para que quede derecho
-            const x = cx + r * Math.cos(theta);
-            const y = cy - r * Math.sin(theta);
+          const theta = (i / 200) * Math.PI * 2;
+          const r = getRadiusTarget(theta, currentLevel) * pxScale;
+          const x = cx + r * Math.cos(theta);
+          const y = cy - r * Math.sin(theta);
 
-            if (i === 0) uiCtx.moveTo(x, y);
-            else uiCtx.lineTo(x, y);
+          if (i === 0) uiCtx.moveTo(x, y);
+          else uiCtx.lineTo(x, y);
         }
         uiCtx.closePath();
 
-        // Relleno de contraste sutil
         uiCtx.fillStyle = "rgba(15, 23, 42, 0.40)";
         uiCtx.fill();
 
-        // Borde fluorescente cian
         uiCtx.strokeStyle = "#38bdf8";
         uiCtx.lineWidth = 5;
         uiCtx.shadowColor = "#0284c7";
         uiCtx.shadowBlur = 12;
         uiCtx.stroke();
 
-        // Línea guía interior blanca nítida
         uiCtx.strokeStyle = "#ffffff";
         uiCtx.lineWidth = 1.5;
         uiCtx.shadowBlur = 0;
         uiCtx.stroke();
 
-        uiCtx.restore();
-        }
-        uiCtx.fillStyle = "rgba(15, 23, 42, 0.35)";
-        uiCtx.fill();
-        uiCtx.strokeStyle = "#38bdf8";
-        uiCtx.lineWidth = 5;
-        uiCtx.shadowColor = "#0284c7";
-        uiCtx.shadowBlur = 10;
-        uiCtx.stroke();
-        uiCtx.strokeStyle = "#ffffff";
-        uiCtx.lineWidth = 1.5;
-        uiCtx.stroke();
         uiCtx.restore();
       }
 
@@ -479,7 +444,6 @@ const nombresFormas = ["", "💧 Gota", "❤️ Corazón", "☁️ Nube", "🦴 
         }
 
         const err = count > 0 ? totalDiff / count : 1;
-        // Tolerancia calibrada para que al calzar visualmente alcance 75%-90%
         currentMatch = Math.max(0, Math.min(100, Math.round((1 - err / 0.42) * 100)));
         document.getElementById("lblMatch").innerText = currentMatch + "%";
 
@@ -601,7 +565,7 @@ const nombresFormas = ["", "💧 Gota", "❤️ Corazón", "☁️ Nube", "🦴 
         renderer.render(scene, camera);
       }
       anim();
-    
+    }
   </script>
 </body>
 </html>
