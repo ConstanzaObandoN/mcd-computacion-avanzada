@@ -60,7 +60,10 @@
     }
   </style>
 
+  <!-- Three.js + SVGLoader Oficial compatible con r128 -->
   <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/loaders/SVGLoader.js"></script>
+  
   <script src="https://cdn.jsdelivr.net/npm/@mediapipe/camera_utils/camera_utils.js" crossorigin="anonymous"></script>
   <script src="https://cdn.jsdelivr.net/npm/@mediapipe/hands/hands.js" crossorigin="anonymous"></script>
   <script src="https://unpkg.com/mqtt/dist/mqtt.min.js"></script>
@@ -122,7 +125,7 @@
       <div id="levelBadge">
         <div>
           <div style="font-size: 10px; color: #94a3b8; text-transform: uppercase;">Objetivo Actual</div>
-          <div class="level-title" id="lblLevelName">Nivel 1: 💧 Gota</div>
+          <div class="level-title" id="lblLevelName">Nivel 1: Gota</div>
         </div>
         <div class="match-tag" id="lblMatch">0%</div>
       </div>
@@ -161,6 +164,20 @@
     let gameActive = false;
     let activeCalibCam = null;
 
+    // Archivos SVG exactos en tu carpeta
+    const SVG_FILES = [
+      "",
+      "gota.svg",
+      "corazon.svg",
+      "flor.svg",
+      "hueso.svg",
+      "estrella.svg"
+    ];
+    const NOMBRES_NIVELES = ["", "💧 Gota", "❤️ Corazón", "🌸 Flor", "🦴 Hueso", "⭐ Estrella"];
+
+    // Puntos del SVG actual cargado
+    let currentTargetPoints = [];
+
     // Selector de Color
     const colorGrid = document.getElementById("colorGrid");
     COLORS.forEach(c => {
@@ -176,7 +193,6 @@
     });
 
     function goToStep(step) {
-      // Detener cámara previa si existía para liberar el sensor en el móvil
       if (activeCalibCam) {
         try { activeCalibCam.stop(); } catch(e) {}
         activeCalibCam = null;
@@ -201,22 +217,13 @@
       }
     }
 
-    // Conexión MQTT EMQX
-    const client = mqtt.connect("wss://broker.emqx.io:8084/mqtt", {
-      clientId: USER_ID,
-      clean: true
-    });
-
-    client.on("connect", () => {
-      client.subscribe(TOPIC_CONTROL);
-    });
-
+    // MQTT
+    const client = mqtt.connect("wss://broker.emqx.io:8084/mqtt", { clientId: USER_ID, clean: true });
+    client.on("connect", () => client.subscribe(TOPIC_CONTROL));
     client.on("message", (topic, message) => {
       try {
         const cmd = JSON.parse(message.toString());
-        if (cmd.action === "START_RACE") {
-          goToStep(5);
-        }
+        if (cmd.action === "START_RACE") goToStep(5);
       } catch (e) {}
     });
 
@@ -291,40 +298,8 @@
     }
 
     // =========================================================
-    // MATEMÁTICA UNIFICADA Y ORIENTADA (+Y = Arriba)
+    // JUEGO PRINCIPAL CON THREE.JS + SVGLOADER
     // =========================================================
-    function getRadiusTarget(theta, lvl) {
-      if (lvl === 1) {
-        // 1. GOTA ESBELTA: Punta arriba (+Y), base ancha abajo (-Y)
-        const sinT = Math.sin(theta);
-        if (sinT > 0) {
-          return 0.75 + 0.55 * Math.pow(sinT, 2.2);
-        } else {
-          return 0.75 + 0.10 * Math.abs(sinT);
-        }
-      } else if (lvl === 2) {
-        // 2. CORAZÓN DERECHO: Lóbulos arriba, punta abajo
-        const t = theta - Math.PI / 2;
-        const x = 16 * Math.pow(Math.sin(t), 3);
-        const y = -(13 * Math.cos(t) - 5 * Math.cos(2*t) - 2 * Math.cos(3*t) - Math.cos(4*t));
-        return (Math.hypot(x, y) / 16) * 1.15;
-      } else if (lvl === 3) {
-        // 3. NUBE: Base plana abajo y 3 cúmulos redondos arriba
-        const sinT = Math.sin(theta);
-        if (sinT < -0.2) return 0.65;
-        return 0.85 + 0.35 * Math.sin(3 * theta);
-      } else if (lvl === 4) {
-        // 4. HUESO: Cintura horizontal estrecha, 2 extremos anchos
-        const cos2 = Math.cos(2 * theta);
-        return 0.88 + 0.38 * cos2;
-      } else {
-        // 5. FLOR (5 pétalos)
-        return 0.85 + 0.42 * Math.cos(5 * (theta - Math.PI / 2));
-      }
-    }
-
-    const nombresFormas = ["", "💧 Gota", "❤️ Corazón", "☁️ Nube", "🦴 Hueso", "🌸 Flor"];
-
     function iniciarJuegoAR() {
       gameActive = true;
       const vid = document.getElementById("webcam");
@@ -345,6 +320,7 @@
       dirLight.position.set(3, 5, 4);
       scene.add(dirLight);
 
+      // Masa Three.js
       const R_BASE = 0.80;
       const geometry = new THREE.CylinderGeometry(R_BASE, R_BASE, 0.20, 90, 8, false);
       geometry.rotateX(Math.PI / 2);
@@ -361,42 +337,74 @@
       const doughMesh = new THREE.Mesh(geometry, material);
       scene.add(doughMesh);
 
-      function dibujarSiluetaAltoContraste(w, h) {
-        const cx = w / 2;
-        const cy = h / 2;
-        const pxScale = Math.min(w, h) * 0.25;
+      // Contenedor visual del SVG en 3D
+      let currentSvgLine = null;
+      const svgLoader = new THREE.SVGLoader();
 
-        uiCtx.save();
-        uiCtx.beginPath();
+      // Función con reintentos para soportar Asset/ o assets/
+      function cargarSVGNivel(lvl) {
+        if (lvl > 5) return;
+        const filename = SVG_FILES[lvl];
+        const rutas = [`Asset/${filename}`, `assets/${filename}`, `./Asset/${filename}`, `./assets/${filename}`];
 
-        for (let i = 0; i <= 200; i++) {
-          const theta = (i / 200) * Math.PI * 2;
-          const r = getRadiusTarget(theta, currentLevel) * pxScale;
-          const x = cx + r * Math.cos(theta);
-          const y = cy - r * Math.sin(theta);
+        function tryLoad(index) {
+          if (index >= rutas.length) {
+            console.error("No se pudo cargar el SVG:", filename);
+            return;
+          }
+          svgLoader.load(
+            rutas[index],
+            (data) => {
+              if (currentSvgLine) scene.remove(currentSvgLine);
 
-          if (i === 0) uiCtx.moveTo(x, y);
-          else uiCtx.lineTo(x, y);
+              currentTargetPoints = [];
+              const rawPoints = [];
+
+              data.paths.forEach((path) => {
+                const shapes = THREE.SVGLoader.createShapes(path);
+                shapes.forEach((shape) => {
+                  const pts = shape.getPoints(120);
+                  pts.forEach(p => rawPoints.push(new THREE.Vector2(p.x, p.y)));
+                });
+              });
+
+              if (rawPoints.length === 0) return;
+
+              // Centrar el SVG en el origen (0,0) y escalar a tamaño adecuado (~2.2 unidades)
+              const box = new THREE.Box2().setFromPoints(rawPoints);
+              const center = box.getCenter(new THREE.Vector2());
+              const size = box.getSize(new THREE.Vector2());
+              const maxDim = Math.max(size.x, size.y) || 1;
+              const scale = 2.3 / maxDim;
+
+              const centeredPts3D = [];
+              currentTargetPoints = rawPoints.map(p => {
+                // Invertir Y porque en SVG +Y baja
+                const nx = (p.x - center.x) * scale;
+                const ny = -(p.y - center.y) * scale;
+                centeredPts3D.push(new THREE.Vector3(nx, ny, 0.12));
+                return { x: nx, y: ny, r: Math.hypot(nx, ny), theta: Math.atan2(ny, nx) };
+              });
+
+              // Crear línea neón 3D fluida
+              const lineGeo = new THREE.BufferGeometry().setFromPoints(centeredPts3D);
+              const lineMat = new THREE.LineBasicMaterial({ color: 0x38bdf8, linewidth: 4 });
+              currentSvgLine = new THREE.LineLoop(lineGeo, lineMat);
+              scene.add(currentSvgLine);
+
+              document.getElementById("lblLevelName").innerText = `Nivel ${lvl}: ${NOMBRESNIVELES[lvl]}`;
+            },
+            undefined,
+            () => tryLoad(index + 1) // Si falla la ruta, prueba la siguiente opción de mayúscula/minúscula
+          );
         }
-        uiCtx.closePath();
 
-        uiCtx.fillStyle = "rgba(15, 23, 42, 0.40)";
-        uiCtx.fill();
-
-        uiCtx.strokeStyle = "#38bdf8";
-        uiCtx.lineWidth = 5;
-        uiCtx.shadowColor = "#0284c7";
-        uiCtx.shadowBlur = 12;
-        uiCtx.stroke();
-
-        uiCtx.strokeStyle = "#ffffff";
-        uiCtx.lineWidth = 1.5;
-        uiCtx.shadowBlur = 0;
-        uiCtx.stroke();
-
-        uiCtx.restore();
+        tryLoad(0);
       }
 
+      cargarSVGNivel(1);
+
+      // Deformación de masa física
       function deformarMasaFirme(hit, brushRadius, fuerza, action) {
         if (!hit || fuerza <= 0 || action === "idle" || !gameActive) return;
 
@@ -414,7 +422,7 @@
             const radDist = Math.hypot(vx, vy) || 1;
             const nuevoR = radDist + factor;
 
-            if (nuevoR >= 0.35 && nuevoR <= 1.70) {
+            if (nuevoR >= 0.35 && nuevoR <= 1.75) {
               pos.setX(i, (vx / radDist) * nuevoR);
               pos.setY(i, (vy / radDist) * nuevoR);
             }
@@ -422,10 +430,13 @@
         }
         pos.needsUpdate = true;
         geometry.computeVertexNormals();
-        evaluarProgreso();
+        evaluarProgresoSVG();
       }
 
-      function evaluarProgreso() {
+      // Evaluación del porcentaje comparando la masa contra los vértices exactos del SVG
+      function evaluarProgresoSVG() {
+        if (!currentTargetPoints || currentTargetPoints.length === 0) return;
+
         const pos = geometry.attributes.position;
         let totalDiff = 0;
         let count = 0;
@@ -437,8 +448,19 @@
 
           if (rActual > 0.45) {
             const theta = Math.atan2(y, x);
-            const rTarget = getRadiusTarget(theta, currentLevel);
-            totalDiff += Math.abs(rActual - rTarget);
+
+            // Buscar el punto del SVG con ángulo polar más cercano
+            let closest = currentTargetPoints[0];
+            let minDiffAngle = 999;
+            for (let j = 0; j < currentTargetPoints.length; j++) {
+              const diffA = Math.abs(currentTargetPoints[j].theta - theta);
+              if (diffA < minDiffAngle) {
+                minDiffAngle = diffA;
+                closest = currentTargetPoints[j];
+              }
+            }
+
+            totalDiff += Math.abs(rActual - closest.r);
             count++;
           }
         }
@@ -459,7 +481,7 @@
         }
         pos.needsUpdate = true;
         geometry.computeVertexNormals();
-        evaluarProgreso();
+        document.getElementById("lblMatch").innerText = "0%";
       }
 
       function avanzarNivel() {
@@ -473,13 +495,14 @@
           if (currentLevel > 5) {
             document.getElementById("lblLevelName").innerText = "🏆 ¡META ALCANZADA!";
           } else {
-            document.getElementById("lblLevelName").innerText = `Nivel ${currentLevel}: ${nombresFormas[currentLevel]}`;
             resetMasa();
+            cargarSVGNivel(currentLevel);
             gameActive = true;
           }
         }, 1500);
       }
 
+      // Telemetría continua a la pantalla central
       setInterval(() => {
         if (client.connected) {
           client.publish(TOPIC_TELEMETRY, JSON.stringify({
@@ -500,7 +523,6 @@
       handsGame.onResults((res) => {
         uiCtx.save();
         uiCtx.clearRect(0, 0, uiCnv.width, uiCnv.height);
-        dibujarSiluetaAltoContraste(uiCnv.width, uiCnv.height);
 
         const count = res.multiHandLandmarks ? res.multiHandLandmarks.length : 0;
         const now = Date.now();
@@ -512,6 +534,7 @@
 
             document.getElementById("lblCurrentAction").innerText = gst.label;
 
+            // Esqueleto en Canvas 2D
             uiCtx.strokeStyle = gst.action === "push" ? "#ef4444" : gst.action === "pull" ? "#38bdf8" : "rgba(148, 163, 184, 0.7)";
             uiCtx.lineWidth = 3;
             for (const [s, e] of HAND_CONNECTIONS) {
@@ -521,6 +544,7 @@
               uiCtx.stroke();
             }
 
+            // Coordenadas 3D coincidentes con Three.js
             const hitPos3D = {
               x: Number((-(gst.point.x - 0.5) * 4.6).toFixed(3)),
               y: Number((-(gst.point.y - 0.5) * 5.4).toFixed(3)),
