@@ -1,0 +1,387 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+  <title>Telemetría Biomecánica - Prototipos v2</title>
+  <style>
+    :root {
+      --bg: #0b0f19;
+      --card: #151d30;
+      --border: #243049;
+      --accent: #38bdf8;
+      --text: #f8fafc;
+      --text-muted: #94a3b8;
+    }
+    body {
+      margin: 0; padding: 0; background: var(--bg); color: var(--text);
+      font-family: system-ui, -apple-system, sans-serif;
+      display: flex; flex-direction: column; height: 100vh; overflow: hidden;
+    }
+    header {
+      background: var(--card); border-bottom: 1px solid var(--border);
+      padding: 10px 18px; display: flex; justify-content: space-between; align-items: center;
+    }
+    .header-title { font-size: 16px; font-weight: 800; color: var(--accent); display: flex; align-items: center; gap: 8px; }
+    .btn {
+      border: none; border-radius: 8px; padding: 8px 14px; font-weight: 700;
+      font-size: 12px; cursor: pointer; transition: all 0.2s;
+    }
+    .btn-rec { background: #ef4444; color: white; }
+    .btn-rec.active { background: #22c55e; animation: pulse 1.5s infinite; }
+    .btn-csv { background: #0284c7; color: white; margin-left: 8px; }
+    @keyframes pulse { 0% { opacity: 1; } 50% { opacity: 0.6; } 100% { opacity: 1; } }
+
+    #workspace {
+      flex: 1; display: grid; grid-template-columns: 1.1fr 0.9fr; gap: 12px; padding: 12px; box-sizing: border-box; overflow: hidden;
+    }
+    @media (max-width: 900px) {
+      #workspace { grid-template-columns: 1fr; grid-template-rows: 1fr 1fr; }
+    }
+
+    /* Panel Cámara */
+    #camPanel {
+      position: relative; background: #000; border-radius: 12px; overflow: hidden;
+      border: 1px solid var(--border); display: flex; justify-content: center; align-items: center;
+    }
+    video, canvas {
+      position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; transform: scaleX(-1);
+    }
+    #hudGesto {
+      position: absolute; top: 12px; left: 12px; right: 12px; z-index: 10;
+      background: rgba(15, 23, 42, 0.88); backdrop-filter: blur(8px);
+      border: 1px solid var(--border); border-radius: 10px; padding: 12px;
+      display: flex; justify-content: space-between; align-items: center;
+    }
+    .gesture-badge { font-size: 18px; font-weight: 900; }
+    .sub-badge { font-size: 11px; color: var(--text-muted); font-family: ui-monospace, monospace; }
+
+    /* Panel Métricas y Datos */
+    #dataPanel {
+      display: flex; flex-direction: column; gap: 10px; overflow: hidden;
+    }
+    .card {
+      background: var(--card); border: 1px solid var(--border); border-radius: 10px;
+      padding: 12px; box-sizing: border-box;
+    }
+    .card-title { font-size: 11px; font-weight: 800; color: #facc15; text-transform: uppercase; margin-bottom: 8px; }
+    
+    .grid-dist {
+      display: grid; grid-template-columns: 1fr 1fr; gap: 8px; font-size: 11px;
+    }
+    .metric-box {
+      background: rgba(11, 15, 25, 0.6); padding: 8px; border-radius: 6px; border: 1px solid var(--border);
+    }
+    .metric-name { color: var(--text-muted); font-size: 10px; display: block; }
+    .metric-val { font-size: 16px; font-weight: 800; color: var(--accent); font-family: ui-monospace, monospace; }
+
+    /* Tabla Histórica */
+    .table-container {
+      flex: 1; overflow-y: auto; background: rgba(11, 15, 25, 0.7);
+      border-radius: 8px; border: 1px solid var(--border);
+    }
+    table { width: 100%; border-collapse: collapse; font-size: 11px; text-align: left; }
+    th { background: #1e293b; color: var(--text-muted); padding: 6px 8px; position: sticky; top: 0; font-weight: 700; }
+    td { padding: 5px 8px; border-bottom: 1px solid rgba(255,255,255,0.05); font-family: ui-monospace, monospace; }
+  </style>
+
+  <script src="https://cdn.jsdelivr.net/npm/@mediapipe/camera_utils/camera_utils.js" crossorigin="anonymous"></script>
+  <script src="https://cdn.jsdelivr.net/npm/@mediapipe/hands/hands.js" crossorigin="anonymous"></script>
+</head>
+<body>
+
+  <header>
+    <div class="header-title">
+      <span>🔬 BANCO DE ENSAYOS: CINEMÁTICA Y DEFORMACIÓN</span>
+    </div>
+    <div>
+      <button class="btn btn-rec" id="btnRecord" onclick="toggleRecording()">⏺ Grabar Telemetría</button>
+      <button class="btn btn-csv" onclick="exportCSV()">📥 Exportar CSV</button>
+    </div>
+  </header>
+
+  <div id="workspace">
+    <!-- Vista de Cámara -->
+    <div id="camPanel">
+      <video id="webcam" playsinline muted></video>
+      <canvas id="outputCanvas"></canvas>
+
+      <div id="hudGesto">
+        <div>
+          <div style="font-size: 10px; color: var(--text-muted);">CLASIFICACIÓN ACTIVA</div>
+          <div class="gesture-badge" id="lblGesto" style="color: #94a3b8;">✋ Esperando mano...</div>
+        </div>
+        <div style="text-align: right;">
+          <div class="sub-badge" id="lblConfidence">Confianza: --</div>
+          <div class="sub-badge" id="lblHandedness">Mano: --</div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Panel de Datos -->
+    <div id="dataPanel">
+      <!-- Biometría de Apertura / Deformación -->
+      <div class="card">
+        <div class="card-title">Distancias Inter-Landmark (Proxy Deformación)</div>
+        <div class="grid-dist">
+          <div class="metric-box">
+            <span class="metric-name">D1: Pulgar-Índice (Pellizco)</span>
+            <span class="metric-val" id="d_thumb_index">0.00</span>
+          </div>
+          <div class="metric-box">
+            <span class="metric-name">D2: Pulgar-Medio (Trípode)</span>
+            <span class="metric-val" id="d_thumb_middle">0.00</span>
+          </div>
+          <div class="metric-box">
+            <span class="metric-name">D3: Índice-Palma (Hundimiento/Poke)</span>
+            <span class="metric-val" id="d_index_palm">0.00</span>
+          </div>
+          <div class="metric-box">
+            <span class="metric-name">D4: Apertura Radial Total</span>
+            <span class="metric-val" id="d_span_total">0.00</span>
+          </div>
+        </div>
+      </div>
+
+      <!-- Resumen Estadístico -->
+      <div class="card" style="display:flex; justify-content:space-around; text-align:center;">
+        <div>
+          <span style="font-size:10px; color:var(--text-muted);">Tiempo Registro</span>
+          <div style="font-size:16px; font-weight:800; color:#facc15;" id="recTimer">00:00.0</div>
+        </div>
+        <div>
+          <span style="font-size:10px; color:var(--text-muted);">Muestras Guardadas</span>
+          <div style="font-size:16px; font-weight:800; color:#38bdf8;" id="sampleCount">0</div>
+        </div>
+        <div>
+          <span style="font-size:10px; color:var(--text-muted);">Estado Sensor</span>
+          <div style="font-size:16px; font-weight:800; color:#22c55e;" id="sensorStatus">Listo</div>
+        </div>
+      </div>
+
+      <!-- Registro Continuo -->
+      <div class="card" style="flex:1; display:flex; flex-direction:column;">
+        <div class="card-title">Registro Temporal de Ensayos</div>
+        <div class="table-container">
+          <table>
+            <thead>
+              <tr>
+                <th>Tiempo (s)</th>
+                <th>Gesto</th>
+                <th>D1 (P-I)</th>
+                <th>D3 (I-Palma)</th>
+                <th>Conf.</th>
+              </tr>
+            </thead>
+            <tbody id="telemetryBody"></tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    const vid = document.getElementById("webcam");
+    const cnv = document.getElementById("outputCanvas");
+    const ctx = cnv.getContext("2d");
+
+    let isRecording = false;
+    let recStartTime = null;
+    let recTimerInterval = null;
+    const telemetryDataset = [];
+
+    const HAND_CONNECTIONS = [
+      [0,1],[1,2],[2,3],[3,4],[0,5],[5,6],[6,7],[7,8],
+      [5,9],[9,10],[10,11],[11,12],[9,13],[13,14],[14,15],[15,16],
+      [13,17],[17,18],[18,19],[19,20],[0,17]
+    ];
+
+    // Distancia Euclidiana en 3D
+    function dist3D(p1, p2) {
+      return Math.hypot(p1.x - p2.x, p1.y - p2.y, (p1.z || 0) - (p2.z || 0));
+    }
+
+    // Clasificación de los 5 Gestos Clave
+    function clasificarCinematica(lm) {
+      const wrist = lm[0];
+      const palmCenter = lm[9]; // Nudillo medio como referencia de base
+      // Ancho de palma como factor de normalización (independiente de distancia al lente)
+      const palmScale = dist3D(wrist, palmCenter) || 0.1;
+
+      // Distancias inter-landmark normalizadas
+      const dThumbIndex  = dist3D(lm[4], lm[8]) / palmScale;
+      const dThumbMiddle = dist3D(lm[4], lm[12]) / palmScale;
+      const dIndexPalm   = dist3D(lm[8], wrist) / palmScale;
+      const dThumbPinky  = dist3D(lm[4], lm[20]) / palmScale;
+
+      // Extensión relativa de dedos
+      const isExt = (tip, pip) => dist3D(lm[tip], wrist) > dist3D(lm[pip], wrist);
+      const thumbExt  = dist3D(lm[4], lm[9]) > dist3D(lm[2], lm[9]);
+      const indexExt  = isExt(8, 6);
+      const middleExt = isExt(12, 10);
+      const ringExt   = isExt(16, 14);
+      const pinkyExt  = isExt(20, 18);
+
+      // Actualizar métricas HUD
+      document.getElementById("d_thumb_index").innerText = dThumbIndex.toFixed(2);
+      document.getElementById("d_thumb_middle").innerText = dThumbMiddle.toFixed(2);
+      document.getElementById("d_index_palm").innerText = dIndexPalm.toFixed(2);
+      document.getElementById("d_span_total").innerText = dThumbPinky.toFixed(2);
+
+      // 1. PINZA FINA DE PRECISIÓN (Pull / Tracción)
+      if (dThumbIndex < 0.35) {
+        return { name: "🤏 1. Pinza de Precisión", code: "PINCH_PRECISION", color: "#38bdf8", d1: dThumbIndex, d3: dIndexPalm };
+      }
+
+      // 2. PINZA TRÍPODE (Sujeción de volumen)
+      if (dThumbIndex < 0.50 && dThumbMiddle < 0.50 && !ringExt && !pinkyExt) {
+        return { name: "🤌 2. Pinza Trípode", code: "PINCH_TRIPOD", color: "#a855f7", d1: dThumbIndex, d3: dIndexPalm };
+      }
+
+      // 3. APUNTAR / POKING (Push / Presión focalizada)
+      if (indexExt && !middleExt && !ringExt && !pinkyExt) {
+        return { name: "☝️ 3. Apuntar (Poking)", code: "POKE_PUSH", color: "#ef4444", d1: dThumbIndex, d3: dIndexPalm };
+      }
+
+      // 4. PUÑO CERRADO (Compresión total / Power Grasp)
+      if (!indexExt && !middleExt && !ringExt && !pinkyExt && !thumbExt) {
+        return { name: "✊ 4. Puño Cerrado (Aplastamiento)", code: "POWER_FIST", color: "#f97316", d1: dThumbIndex, d3: dIndexPalm };
+      }
+
+      // 5. PALMA ABIERTA (Aplanado superficial / Reposo)
+      if (indexExt && middleExt && ringExt && pinkyExt) {
+        return { name: "🖐️ 5. Palma Abierta (Aplanado)", code: "PALM_OPEN", color: "#22c55e", d1: dThumbIndex, d3: dIndexPalm };
+      }
+
+      return { name: "✋ Transición / Neutro", code: "TRANSITION", color: "#94a3b8", d1: dThumbIndex, d3: dIndexPalm };
+    }
+
+    const hands = new Hands({ locateFile: (f) => `https://cdn.jsdelivr.net/npm/@mediapipe/hands/${f}` });
+    hands.setOptions({ maxNumHands: 1, modelComplexity: 1, minDetectionConfidence: 0.6, minTrackingConfidence: 0.6 });
+
+    let lastLogTime = 0;
+
+    hands.onResults((res) => {
+      ctx.save();
+      ctx.clearRect(0, 0, cnv.width, cnv.height);
+
+      if (res.multiHandLandmarks && res.multiHandLandmarks.length > 0) {
+        const lm = res.multiHandLandmarks[0];
+        const handedness = res.multiHandedness[0] ? res.multiHandedness[0].label : "Mano";
+        const score = res.multiHandedness[0] ? Math.round(res.multiHandedness[0].score * 100) : 0;
+
+        document.getElementById("lblHandedness").innerText = `Mano: ${handedness === "Left" ? "Derecha (Espejo)" : "Izquierda"}`;
+        document.getElementById("lblConfidence").innerText = `Confianza: ${score}%`;
+
+        const gest = clasificarCinematica(lm);
+        const lbl = document.getElementById("lblGesto");
+        lbl.innerText = gest.name;
+        lbl.style.color = gest.color;
+
+        // Render esqueleto
+        ctx.strokeStyle = gest.color;
+        ctx.lineWidth = 3.5;
+        for (const [s, e] of HAND_CONNECTIONS) {
+          ctx.beginPath();
+          ctx.moveTo((1 - lm[s].x) * cnv.width, lm[s].y * cnv.height);
+          ctx.lineTo((1 - lm[e].x) * cnv.width, lm[e].y * cnv.height);
+          ctx.stroke();
+        }
+
+        // Resaltar nodos clave con cotas visuales
+        [4, 8, 12, 16, 20].forEach(tip => {
+          ctx.beginPath();
+          ctx.arc((1 - lm[tip].x) * cnv.width, lm[tip].y * cnv.height, 6, 0, Math.PI * 2);
+          ctx.fillStyle = "#ffffff";
+          ctx.fill();
+        });
+
+        // Trazar línea de cota entre pulgar e índice
+        ctx.beginPath();
+        ctx.setLineDash([4, 4]);
+        ctx.moveTo((1 - lm[4].x) * cnv.width, lm[4].y * cnv.height);
+        ctx.lineTo((1 - lm[8].x) * cnv.width, lm[8].y * cnv.height);
+        ctx.strokeStyle = "#facc15";
+        ctx.lineWidth = 2;
+        ctx.stroke();
+        ctx.setLineDash([]);
+
+        // Registro de telemetría si está grabando (cada 150 ms para no saturar)
+        const now = Date.now();
+        if (isRecording && now - lastLogTime > 150) {
+          lastLogTime = now;
+          const elapsedSec = ((now - recStartTime) / 1000).toFixed(2);
+
+          telemetryDataset.push({
+            time_sec: elapsedSec,
+            gesture: gest.code,
+            d1_thumb_index: gest.d1.toFixed(3),
+            d3_index_palm: gest.d3.toFixed(3),
+            confidence: score
+          });
+
+          document.getElementById("sampleCount").innerText = telemetryDataset.length;
+
+          const tr = document.createElement("tr");
+          tr.innerHTML = `<td>${elapsedSec}s</td><td style="color:${gest.color}; font-weight:bold;">${gest.code}</td><td>${gest.d1.toFixed(2)}</td><td>${gest.d3.toFixed(2)}</td><td>${score}%</td>`;
+          const body = document.getElementById("telemetryBody");
+          body.prepend(tr);
+          if (body.children.length > 50) body.removeChild(body.lastChild);
+        }
+      } else {
+        document.getElementById("lblGesto").innerText = "✋ Esperando mano...";
+        document.getElementById("lblGesto").style.color = "#94a3b8";
+      }
+      ctx.restore();
+    });
+
+    const cam = new Camera(vid, {
+      onFrame: async () => {
+        cnv.width = vid.videoWidth;
+        cnv.height = vid.videoHeight;
+        await hands.send({ image: vid });
+      },
+      width: 640, height: 480
+    });
+    cam.start();
+
+    function toggleRecording() {
+      isRecording = !isRecording;
+      const btn = document.getElementById("btnRecord");
+      if (isRecording) {
+        btn.classList.add("active");
+        btn.innerText = "⏹ Detener Grabación";
+        recStartTime = Date.now();
+        recTimerInterval = setInterval(() => {
+          const t = Date.now() - recStartTime;
+          const s = Math.floor(t / 1000);
+          const ms = Math.floor((t % 1000) / 100);
+          document.getElementById("recTimer").innerText = `${String(s).padStart(2, '0')}.${ms}s`;
+        }, 100);
+      } else {
+        btn.classList.remove("active");
+        btn.innerText = "⏺ Grabar Telemetría";
+        clearInterval(recTimerInterval);
+      }
+    }
+
+    function exportCSV() {
+      if (telemetryDataset.length === 0) {
+        alert("No hay muestras grabadas aún. Presiona 'Grabar Telemetría' primero.");
+        return;
+      }
+      let csv = "data:text/csv;charset=utf-8,Timestamp_Sec,Gesture_Code,D1_Thumb_Index_Ratio,D3_Index_Palm_Ratio,Confidence_Percent\n";
+      telemetryDataset.forEach(r => {
+        csv += `${r.time_sec},${r.gesture},${r.d1_thumb_index},${r.d3_index_palm},${r.confidence}\n`;
+      });
+      const uri = encodeURI(csv);
+      const link = document.createElement("a");
+      link.setAttribute("href", uri);
+      link.setAttribute("download", `ensayo_biomecanico_${Date.now()}.csv`);
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+    }
+  </script>
+</body>
+</html>
